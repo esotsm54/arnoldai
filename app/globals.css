@@ -17,6 +17,12 @@
   display: none;
 }
 
+/* Chrome ignores text-align on the internal date fields; center the wrapper itself */
+.date-plain::-webkit-datetime-edit {
+  display: flex;
+  justify-content: center;
+}
+
 body {
   background: linear-gradient(160deg, #e7f0f2 0%, #e9eef4 45%, #eef0ea 100%)
     fixed var(--background);

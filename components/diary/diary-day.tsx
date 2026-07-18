@@ -129,7 +129,7 @@ export function DiaryDay() {
                 // some browsers only open the picker via the native indicator
               }
             }}
-            className="date-plain cursor-pointer rounded-xl bg-transparent px-3 py-1.5 text-center text-sm font-medium text-slate-900 outline-none"
+            className="date-plain w-[12ch] cursor-pointer rounded-xl bg-transparent px-0 py-1.5 text-center text-sm font-medium text-slate-900 outline-none"
           />
           <span className="text-xs text-slate-500">{dayLabel(date)}</span>
         </div>
