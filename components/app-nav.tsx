@@ -92,14 +92,14 @@ export function AppNav() {
               key={href}
               href={href}
               aria-label={label}
-              className={`flex items-center gap-2 rounded-full transition-colors ${
+              aria-current={active ? "page" : undefined}
+              className={`rounded-full p-2.5 transition-colors ${
                 active
-                  ? "bg-[#f6ead8] text-slate-900 px-4 py-2.5 font-medium"
-                  : "text-slate-500 hover:text-slate-800 p-2.5"
+                  ? "text-emerald-600"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              {active && <span className="text-sm">{label}</span>}
             </Link>
           );
         })}
