@@ -118,7 +118,7 @@ export function PushManager() {
         {status === "not-subscribed" ? (
           <button
             onClick={subscribe}
-            className="rounded-lg bg-white text-slate-900 px-4 py-2 text-sm font-medium hover:bg-slate-200"
+            className="rounded-full bg-slate-900 text-white px-5 py-2 text-sm font-medium hover:bg-slate-700"
           >
             Enable notifications
           </button>
@@ -126,13 +126,13 @@ export function PushManager() {
           <>
             <button
               onClick={sendTest}
-              className="rounded-lg bg-white text-slate-900 px-4 py-2 text-sm font-medium hover:bg-slate-200"
+              className="rounded-full bg-slate-900 text-white px-5 py-2 text-sm font-medium hover:bg-slate-700"
             >
               Send test notification
             </button>
             <button
               onClick={unsubscribe}
-              className="rounded-lg border border-slate-600 px-4 py-2 text-sm hover:bg-slate-800"
+              className="rounded-full ring-1 ring-black/10 text-slate-700 px-5 py-2 text-sm hover:bg-slate-100"
             >
               Disable
             </button>

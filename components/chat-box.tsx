@@ -37,9 +37,9 @@ export function ChatBox() {
 
   return (
     <div className="flex flex-col gap-3 w-full">
-      <div className="flex flex-col gap-2 max-h-80 overflow-y-auto rounded-lg border border-slate-700 p-3 min-h-24">
+      <div className="flex flex-col gap-2 max-h-80 overflow-y-auto rounded-2xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm p-4 min-h-24">
         {messages.length === 0 && (
-          <p className="text-sm opacity-50">Ask Arnold something…</p>
+          <p className="text-sm text-slate-400">Ask Arnold something…</p>
         )}
         {messages.map((m, i) => (
           <p key={i} className="text-sm whitespace-pre-wrap">
@@ -49,20 +49,20 @@ export function ChatBox() {
             {m.content}
           </p>
         ))}
-        {busy && <p className="text-sm opacity-50">Thinking…</p>}
+        {busy && <p className="text-sm text-slate-400">Thinking…</p>}
       </div>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-500">{error}</p>}
       <form onSubmit={send} className="flex gap-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message"
-          className="flex-1 rounded-lg border border-slate-700 bg-transparent px-3 py-2 text-sm outline-none focus:border-slate-400"
+          className="flex-1 rounded-full bg-white/80 ring-1 ring-black/10 px-4 py-2 text-sm outline-none focus:ring-slate-400"
         />
         <button
           type="submit"
           disabled={busy}
-          className="rounded-lg bg-white text-slate-900 px-4 py-2 text-sm font-medium hover:bg-slate-200 disabled:opacity-50"
+          className="rounded-full bg-slate-900 text-white px-5 py-2 text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
         >
           Send
         </button>
