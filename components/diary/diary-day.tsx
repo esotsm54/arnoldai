@@ -122,7 +122,14 @@ export function DiaryDay() {
             type="date"
             value={date}
             onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="rounded-xl bg-transparent px-3 py-1.5 text-center text-sm font-medium text-slate-900 outline-none"
+            onClick={(e) => {
+              try {
+                e.currentTarget.showPicker();
+              } catch {
+                // some browsers only open the picker via the native indicator
+              }
+            }}
+            className="date-plain cursor-pointer rounded-xl bg-transparent px-3 py-1.5 text-center text-sm font-medium text-slate-900 outline-none"
           />
           <span className="text-xs text-slate-500">{dayLabel(date)}</span>
         </div>

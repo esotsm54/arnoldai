@@ -12,6 +12,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Date input without the native calendar icon (click the date to open the picker) */
+.date-plain::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
 body {
   background: linear-gradient(160deg, #e7f0f2 0%, #e9eef4 45%, #eef0ea 100%)
     fixed var(--background);
