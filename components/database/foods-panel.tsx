@@ -9,7 +9,7 @@ import {
   primaryButtonClass,
   ghostButtonClass,
   num,
-} from "./ui";
+} from "@/components/ui";
 
 type Food = {
   id: string;
