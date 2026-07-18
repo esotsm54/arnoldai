@@ -38,6 +38,17 @@ function shiftDate(date: string, days: number): string {
   ).padStart(2, "0")}`;
 }
 
+// "Today" / "Tomorrow" / "Yesterday", otherwise the weekday name
+function dayLabel(date: string): string {
+  const today = todayStr();
+  if (date === today) return "Today";
+  if (date === shiftDate(today, 1)) return "Tomorrow";
+  if (date === shiftDate(today, -1)) return "Yesterday";
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
+    weekday: "long",
+  });
+}
+
 type View =
   | { type: "logDetail"; entry: LogEntry }
   | { type: "logForm"; entry?: LogEntry }
@@ -107,18 +118,21 @@ export function DiaryDay() {
           </svg>
         </button>
         <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="rounded-xl bg-transparent px-3 py-2 text-sm font-medium text-slate-900 outline-none"
-          />
+          <div className="flex flex-col items-center">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+              className="rounded-xl bg-transparent px-3 py-1.5 text-sm font-medium text-slate-900 outline-none"
+            />
+            <span className="text-xs text-slate-500">{dayLabel(date)}</span>
+          </div>
           {date !== todayStr() && (
             <button
               onClick={() => setDate(todayStr())}
               className="rounded-full bg-[#f6ead8] px-3 py-1.5 text-xs font-medium text-slate-900"
             >
-              Today
+              Back to today
             </button>
           )}
         </div>
