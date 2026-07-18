@@ -117,24 +117,14 @@ export function DiaryDay() {
             <path d="M15 6l-6 6 6 6" />
           </svg>
         </button>
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col items-center">
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => e.target.value && setDate(e.target.value)}
-              className="rounded-xl bg-transparent px-3 py-1.5 text-sm font-medium text-slate-900 outline-none"
-            />
-            <span className="text-xs text-slate-500">{dayLabel(date)}</span>
-          </div>
-          {date !== todayStr() && (
-            <button
-              onClick={() => setDate(todayStr())}
-              className="rounded-full bg-[#f6ead8] px-3 py-1.5 text-xs font-medium text-slate-900"
-            >
-              Back to today
-            </button>
-          )}
+        <div className="flex flex-col items-center">
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
+            className="rounded-xl bg-transparent px-3 py-1.5 text-center text-sm font-medium text-slate-900 outline-none"
+          />
+          <span className="text-xs text-slate-500">{dayLabel(date)}</span>
         </div>
         <button
           onClick={() => setDate(shiftDate(date, 1))}
