@@ -294,7 +294,7 @@ export function DiaryDay() {
               <h2 className="text-sm font-semibold text-slate-900">History</h2>
               <div className="mt-3 flex gap-8 border-b border-black/5 pb-3">
                 <div>
-                  <p className="text-xs text-slate-500">Total eaten</p>
+                  <p className="text-xs text-slate-500">Total banked</p>
                   <p className="text-lg font-bold text-slate-900">
                     {Math.round(history.reduce((s, h) => s + h.eaten, 0))}{" "}
                     <span className="text-xs font-normal text-slate-400">kcal</span>
