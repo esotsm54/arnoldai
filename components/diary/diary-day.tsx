@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   DetailRow,
@@ -73,6 +73,7 @@ export function DiaryDay() {
   const [exercises, setExercises] = useState<ExerciseEntry[] | null>(null);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>(null);
+  const summaryRef = useRef<HTMLElement>(null);
 
   async function load() {
     try {
@@ -176,7 +177,7 @@ export function DiaryDay() {
       {!loading && !error && (
         <>
           {/* Summary */}
-          <section className={`${cardClass} p-5`}>
+          <section ref={summaryRef} className={`${cardClass} scroll-mt-4 p-5`}>
             <h2 className="text-sm font-semibold text-slate-900">Summary</h2>
             <div className="mt-3 grid grid-cols-3 gap-3">
               <div>
@@ -291,6 +292,22 @@ export function DiaryDay() {
           {history.length > 0 && (
             <section className={`${cardClass} p-5`}>
               <h2 className="text-sm font-semibold text-slate-900">History</h2>
+              <div className="mt-3 flex gap-8 border-b border-black/5 pb-3">
+                <div>
+                  <p className="text-xs text-slate-500">Total eaten</p>
+                  <p className="text-lg font-bold text-slate-900">
+                    {Math.round(history.reduce((s, h) => s + h.eaten, 0))}{" "}
+                    <span className="text-xs font-normal text-slate-400">kcal</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Total burned</p>
+                  <p className="text-lg font-bold text-[#006300]">
+                    {Math.round(history.reduce((s, h) => s + h.burned, 0))}{" "}
+                    <span className="text-xs font-normal text-slate-400">kcal</span>
+                  </p>
+                </div>
+              </div>
               <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {history.map((h) => {
                   const selected = h.day === date;
@@ -299,7 +316,7 @@ export function DiaryDay() {
                       key={h.day}
                       onClick={() => {
                         setDate(h.day);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
+                        summaryRef.current?.scrollIntoView({ behavior: "smooth" });
                       }}
                       className={`rounded-2xl p-3 text-left ring-1 transition-colors ${
                         selected
