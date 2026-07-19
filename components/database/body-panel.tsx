@@ -9,6 +9,8 @@ import {
   primaryButtonClass,
   ghostButtonClass,
   num,
+  SearchBar,
+  matches,
 } from "@/components/ui";
 
 type BodyEntry = {
@@ -47,6 +49,7 @@ export function BodyPanel() {
   const [entries, setEntries] = useState<BodyEntry[] | null>(null);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>(null);
+  const [query, setQuery] = useState("");
 
   async function load() {
     try {
@@ -64,10 +67,15 @@ export function BodyPanel() {
     load();
   }, []);
 
+  const filtered = (entries ?? []).filter((entry) =>
+    matches(`${entry.day} ${num(entry.weightKg)} ${num(entry.fatPercentage)}`, query)
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
-        <button onClick={() => setView({ mode: "create" })} className={primaryButtonClass}>
+      <div className="flex items-center gap-3">
+        <SearchBar value={query} onChange={setQuery} placeholder="Search by date or weight" />
+        <button onClick={() => setView({ mode: "create" })} className={`${primaryButtonClass} shrink-0`}>
           + Add entry
         </button>
       </div>
@@ -77,25 +85,34 @@ export function BodyPanel() {
       {entries && entries.length === 0 && (
         <p className="text-sm text-slate-400">No entries yet. Add the first one.</p>
       )}
+      {entries && entries.length > 0 && filtered.length === 0 && (
+        <p className="text-sm text-slate-400">No entries match “{query}”.</p>
+      )}
 
-      {entries && entries.length > 0 && (
+      {filtered.length > 0 && (
         <ul className="rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm divide-y divide-black/5 overflow-hidden">
-          {entries.map((entry) => (
+          {filtered.map((entry) => (
             <li key={entry.id}>
               <button
                 onClick={() => setView({ mode: "detail", entry })}
                 className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-white"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{entry.day}</p>
-                  <p className="text-xs text-slate-500">
-                    {entry.weightKg ? `${num(entry.weightKg)} kg` : "no weight"}
-                    {entry.fatPercentage ? ` · ${num(entry.fatPercentage)}% fat` : ""}
+                  <p className="text-base font-semibold text-slate-900">
+                    {entry.weightKg ? `${num(entry.weightKg)} kg` : "—"}
+                    {entry.fatPercentage && (
+                      <span className="font-medium text-slate-600">
+                        {" "}· {num(entry.fatPercentage)}% fat
+                      </span>
+                    )}
                   </p>
                 </div>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0 text-slate-400">
-                  <path d="M9 6l6 6-6 6" />
-                </svg>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-slate-500">{entry.day}</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-slate-400">
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </div>
               </button>
             </li>
           ))}

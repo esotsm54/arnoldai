@@ -16,6 +16,45 @@ export function num(value: string | number | null | undefined): string {
   return Number.isNaN(n) ? "—" : String(n);
 }
 
+export function SearchBar({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="relative flex-1">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-3.5-3.5" />
+      </svg>
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-full bg-white/75 ring-1 ring-black/5 shadow-sm pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-slate-400"
+      />
+    </div>
+  );
+}
+
+// Case- and accent-insensitive matcher for client-side filtering
+export function matches(haystack: string, query: string): boolean {
+  const norm = (s: string) =>
+    s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return norm(haystack).includes(norm(query.trim()));
+}
+
 export function Modal({
   title,
   onClose,

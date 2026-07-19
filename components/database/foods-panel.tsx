@@ -9,6 +9,8 @@ import {
   primaryButtonClass,
   ghostButtonClass,
   num,
+  SearchBar,
+  matches,
 } from "@/components/ui";
 
 type Food = {
@@ -36,6 +38,7 @@ export function FoodsPanel() {
   const [foods, setFoods] = useState<Food[] | null>(null);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>(null);
+  const [query, setQuery] = useState("");
 
   async function load() {
     try {
@@ -53,10 +56,13 @@ export function FoodsPanel() {
     load();
   }, []);
 
+  const filtered = (foods ?? []).filter((f) => matches(f.name, query));
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
-        <button onClick={() => setView({ mode: "create" })} className={primaryButtonClass}>
+      <div className="flex items-center gap-3">
+        <SearchBar value={query} onChange={setQuery} placeholder="Search foods" />
+        <button onClick={() => setView({ mode: "create" })} className={`${primaryButtonClass} shrink-0`}>
           + Add food
         </button>
       </div>
@@ -66,10 +72,13 @@ export function FoodsPanel() {
       {foods && foods.length === 0 && (
         <p className="text-sm text-slate-400">No foods yet. Add the first one.</p>
       )}
+      {foods && foods.length > 0 && filtered.length === 0 && (
+        <p className="text-sm text-slate-400">No foods match “{query}”.</p>
+      )}
 
-      {foods && foods.length > 0 && (
+      {filtered.length > 0 && (
         <ul className="rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm divide-y divide-black/5 overflow-hidden">
-          {foods.map((f) => (
+          {filtered.map((f) => (
             <li key={f.id}>
               <button
                 onClick={() => setView({ mode: "detail", food: f })}
