@@ -38,6 +38,14 @@ function shiftDate(date: string, days: number): string {
   ).padStart(2, "0")}`;
 }
 
+// "Jul 17" style label for history tiles
+function shortDate(date: string): string {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 // "Today" / "Tomorrow" / "Yesterday", otherwise the weekday name
 function dayLabel(date: string): string {
   const today = todayStr();
@@ -103,6 +111,24 @@ export function DiaryDay() {
   const sodium = dayLogs.reduce((s, l) => s + toNum(l.sodium), 0);
 
   const loading = (!logs || !exercises) && !error;
+
+  // Every date with at least one food or exercise entry, newest first
+  const history = useMemo(() => {
+    const days = new Map<string, { eaten: number; burned: number }>();
+    for (const l of logs ?? []) {
+      const d = days.get(l.date) ?? { eaten: 0, burned: 0 };
+      d.eaten += toNum(l.calories);
+      days.set(l.date, d);
+    }
+    for (const e of exercises ?? []) {
+      const d = days.get(e.date) ?? { eaten: 0, burned: 0 };
+      d.burned += toNum(e.caloriesBurned);
+      days.set(e.date, d);
+    }
+    return [...days.entries()]
+      .map(([day, totals]) => ({ day, ...totals }))
+      .sort((a, b) => b.day.localeCompare(a.day));
+  }, [logs, exercises]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -260,6 +286,44 @@ export function DiaryDay() {
               </ul>
             )}
           </section>
+
+          {/* History */}
+          {history.length > 0 && (
+            <section className={`${cardClass} p-5`}>
+              <h2 className="text-sm font-semibold text-slate-900">History</h2>
+              <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {history.map((h) => {
+                  const selected = h.day === date;
+                  return (
+                    <button
+                      key={h.day}
+                      onClick={() => {
+                        setDate(h.day);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`rounded-2xl p-3 text-left ring-1 transition-colors ${
+                        selected
+                          ? "bg-[#f6ead8] ring-black/10"
+                          : "bg-white/60 ring-black/5 hover:bg-white"
+                      }`}
+                    >
+                      <p className="text-xs font-medium text-slate-500">
+                        {shortDate(h.day)}
+                      </p>
+                      <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                        {Math.round(h.eaten)} kcal
+                      </p>
+                      {h.burned > 0 && (
+                        <p className="text-xs text-[#006300]">
+                          {Math.round(h.burned)} burned
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </>
       )}
 
