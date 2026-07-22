@@ -112,7 +112,7 @@ export const READ_ONLY_TOOLS: ToolDef[] = [
   {
     name: "get_daily_summary",
     description:
-      "Get precomputed daily totals — calories eaten, calories burned, and the deficit (TDEE 2730 + burned − eaten) — for each day that has any food or exercise logged. ALWAYS use this instead of summing food_log/exercise entries and doing the deficit math yourself: the numbers here are computed in code, not by you, so they cannot contain an arithmetic mistake. Provide a date (YYYY-MM-DD) for one day; pass null for every day.",
+      "Get precomputed daily totals for each day that has any food or exercise logged: eaten, burned, deficit (TDEE 2730 + burned − eaten), AND cumulativeDeficit — the running total of deficit from the earliest logged day through that day (i.e. total calories banked to date). ALWAYS use these numbers as-is instead of summing food_log/exercise entries, computing the deficit formula, or adding up multiple days' deficits yourself — every value here, including the running total, is computed in code, not by you, so it cannot contain an arithmetic mistake. Provide a date (YYYY-MM-DD) for one day; pass null for every day.",
     parameters: {
       type: "object",
       properties: {

@@ -8,7 +8,7 @@ import type { VizType } from "@/lib/dashboard-store";
 const MODEL = "gpt-5-mini";
 const MAX_TOOL_ITERATIONS = 6;
 
-const INSTRUCTIONS = `You answer data queries about the user's nutrition/fitness data using the available read-only tools. Gather whatever data is needed, then respond with ONLY the structured data requested — no prose, no explanations, no extra commentary. Format numbers for display where the schema asks for a string (e.g. "1,489 kcal"), not raw numbers.\n\nFor anything involving calorie deficit/surplus or daily totals, ALWAYS call get_daily_summary instead of summing food_log/exercise entries and computing the formula yourself — never do that arithmetic by hand, it must come from that tool so it can't contain a mistake.\n\nToday's date is ${todayISO()} (YYYY-MM-DD).`;
+const INSTRUCTIONS = `You answer data queries about the user's nutrition/fitness data using the available read-only tools. Gather whatever data is needed, then respond with ONLY the structured data requested — no prose, no explanations, no extra commentary. Format numbers for display where the schema asks for a string (e.g. "1,489 kcal"), not raw numbers.\n\nFor anything involving calorie deficit/surplus, daily totals, or a running/cumulative total across days, ALWAYS call get_daily_summary and use its eaten/burned/deficit/cumulativeDeficit fields as-is — never sum food_log/exercise entries, compute the deficit formula, or add up multiple days yourself. Any arithmetic you do by hand on this data is assumed wrong; only the tool's numbers are trustworthy.\n\nToday's date is ${todayISO()} (YYYY-MM-DD).`;
 
 function schemaFor(vizType: VizType): { name: string; schema: Record<string, unknown> } {
   switch (vizType) {

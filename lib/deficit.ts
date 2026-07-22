@@ -2,7 +2,14 @@
 // any future UI agree with the Diary page's own calculation.
 export const BASE_TDEE = 2730;
 
-export type DailySummary = { date: string; eaten: number; burned: number; deficit: number };
+export type DailySummary = {
+  date: string;
+  eaten: number;
+  burned: number;
+  deficit: number;
+  /** Running total of `deficit` from the earliest logged day through this one. */
+  cumulativeDeficit: number;
+};
 
 function toNum(v: string | number | null | undefined): number {
   if (v === null || v === undefined || v === "") return 0;
@@ -25,12 +32,20 @@ export function computeDailySummaries(
     d.burned += toNum(e.caloriesBurned);
     days.set(e.date, d);
   }
-  return [...days.entries()]
-    .map(([date, { eaten, burned }]) => ({
+  // Accumulate oldest-to-newest so each day's running total is correct, then
+  // present newest-first like the rest of the app.
+  const ascending = [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  let running = 0;
+  const summaries = ascending.map(([date, { eaten, burned }]) => {
+    const deficit = Math.round(BASE_TDEE + burned - eaten);
+    running += deficit;
+    return {
       date,
       eaten: Math.round(eaten),
       burned: Math.round(burned),
-      deficit: Math.round(BASE_TDEE + burned - eaten),
-    }))
-    .sort((a, b) => b.date.localeCompare(a.date));
+      deficit,
+      cumulativeDeficit: running,
+    };
+  });
+  return summaries.sort((a, b) => b.date.localeCompare(a.date));
 }
