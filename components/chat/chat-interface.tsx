@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Mock UI for the future OpenAI reasoning-model integration: assistant turns
-// are a sequence of parts (thinking, actions, text) like a streamed response.
+// Assistant turns are a sequence of parts (thinking, actions, text) as
+// streamed live from /api/ai/chat — thinking is the model's real reasoning
+// summary and actions are real read-only tool calls against the Arnold API.
 type Part =
   | { type: "thinking"; text: string }
   | { type: "action"; label: string }
@@ -12,41 +13,6 @@ type Part =
 type Message =
   | { role: "user"; text: string; attachments?: string[] }
   | { role: "assistant"; parts: Part[]; pending?: boolean };
-
-const SEED: Message[] = [
-  { role: "user", text: "Add 3 tortillas to my lunch today" },
-  {
-    role: "assistant",
-    parts: [
-      {
-        type: "thinking",
-        text: "The user wants to log food. I should search the food library for the tortillas, then scale the saved values: 1 tortilla = 25 g, so 3 tortillas = 75 g. Factor = 75 / 100 = 0.75 of the base values.",
-      },
-      { type: "action", label: "Searching food library" },
-      { type: "action", label: "Calculating macros (75 g × 0.75)" },
-      { type: "action", label: "Adding to diary — lunch" },
-      {
-        type: "text",
-        text: "Done! I logged 3 Tortillas de almendra Palamano (75 g) to today's lunch: 245 kcal, 6.3 g protein, 16.2 g fat, 18.3 g carbs.",
-      },
-    ],
-  },
-  { role: "user", text: "How am I doing today?" },
-  {
-    role: "assistant",
-    parts: [
-      {
-        type: "thinking",
-        text: "I need today's food log and exercise, then the deficit: TDEE 2730 + burned − eaten.",
-      },
-      { type: "action", label: "Reading today's diary" },
-      {
-        type: "text",
-        text: "You're at 848 kcal eaten with no exercise logged yet, so your running deficit is 1882 kcal. Plenty of room for dinner — around 1400 kcal keeps you on target.",
-      },
-    ],
-  },
-];
 
 const ATTACH_OPTIONS = [
   { id: "image", label: "Image", accept: "image/*", capture: false },
@@ -120,7 +86,7 @@ function AssistantParts({ msg }: { msg: Extract<Message, { role: "assistant" }> 
 }
 
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>(SEED);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -142,12 +108,38 @@ export function ChatInterface() {
     });
   }
 
-  // Simulates the future streamed reasoning response
-  function send(e: React.FormEvent) {
+  function appendToPart(kind: "thinking" | "text", text: string) {
+    updateLastAssistant((m) => {
+      const parts = [...m.parts];
+      const last = parts[parts.length - 1];
+      if (last?.type === kind) {
+        parts[parts.length - 1] = { ...last, text: last.text + text };
+      } else {
+        parts.push({ type: kind, text });
+      }
+      return { ...m, parts };
+    });
+  }
+
+  async function send(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
     if ((!text && attachments.length === 0) || busy) return;
     setBusy(true);
+
+    // Attachments aren't sent to the model yet — only the text goes through.
+    const apiHistory = messages.map((m) =>
+      m.role === "user"
+        ? { role: "user" as const, content: m.text }
+        : {
+            role: "assistant" as const,
+            content: m.parts
+              .filter((p): p is Extract<Part, { type: "text" }> => p.type === "text")
+              .map((p) => p.text)
+              .join("\n\n"),
+          }
+    );
+
     setMessages((prev) => [
       ...prev,
       { role: "user", text, attachments: attachments.length ? attachments : undefined },
@@ -157,38 +149,58 @@ export function ChatInterface() {
     setAttachments([]);
     setMenuOpen(false);
 
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...apiHistory, { role: "user", content: text }],
+        }),
+      });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `Request failed (${res.status})`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.type === "thinking_delta") appendToPart("thinking", event.text);
+          else if (event.type === "text_delta") appendToPart("text", event.text);
+          else if (event.type === "action") {
+            updateLastAssistant((m) => ({
+              ...m,
+              parts: [...m.parts, { type: "action", label: event.label }],
+            }));
+          } else if (event.type === "error") {
+            updateLastAssistant((m) => ({
+              ...m,
+              parts: [...m.parts, { type: "text", text: `⚠️ ${event.message}` }],
+            }));
+          }
+        }
+      }
+    } catch (err) {
       updateLastAssistant((m) => ({
         ...m,
         parts: [
           ...m.parts,
-          {
-            type: "thinking",
-            text: "Parsing the request and deciding which Arnold API endpoints to call…",
-          },
+          { type: "text", text: `⚠️ ${err instanceof Error ? err.message : "Request failed"}` },
         ],
       }));
-    }, 600);
-    setTimeout(() => {
-      updateLastAssistant((m) => ({
-        ...m,
-        parts: [...m.parts, { type: "action", label: "Checking your diary" }],
-      }));
-    }, 1500);
-    setTimeout(() => {
-      updateLastAssistant((m) => ({
-        ...m,
-        pending: false,
-        parts: [
-          ...m.parts,
-          {
-            type: "text",
-            text: "This is a mock reply — the reasoning model isn't connected yet. Your message and any attachments made it through, so the plumbing is ready.",
-          },
-        ],
-      }));
+    } finally {
+      updateLastAssistant((m) => ({ ...m, pending: false }));
       setBusy(false);
-    }, 2600);
+    }
   }
 
   function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -205,6 +217,9 @@ export function ChatInterface() {
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm p-4 flex flex-col gap-4"
       >
+        {messages.length === 0 && (
+          <p className="m-auto text-sm text-slate-400">Ask Arnold something…</p>
+        )}
         {messages.map((msg, i) =>
           msg.role === "user" ? (
             <div key={i} className="self-end max-w-[85%] flex flex-col items-end gap-1">
