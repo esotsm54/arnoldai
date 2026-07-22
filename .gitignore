@@ -34,17 +34,11 @@ yarn-error.log*
 .env*
 !.env.example
 
-# local push subscription store (dev only)
-.subscriptions.json
-
-# local GPT/assistant config store (dev only)
-.gpt-config.json
-
-# local chat conversation store (dev only)
+# leftover local data from before the move to Upstash Redis (personal data — never commit)
 .chats.json
-
-# local dashboard AI-card store (dev only)
+.gpt-config.json
 .dashboard-cards.json
+.subscriptions.json
 
 # vercel
 .vercel

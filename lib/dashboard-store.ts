@@ -1,10 +1,7 @@
-import { promises as fs } from "fs";
-import path from "path";
 import crypto from "crypto";
+import { readBlob, writeBlob } from "@/lib/kv";
 
-// Skeleton storage: a JSON file on disk. Works for local dev only —
-// swap for a database before deploying (serverless filesystems are ephemeral).
-const FILE = path.join(process.cwd(), ".dashboard-cards.json");
+const KEY = "arnold:dashboard-cards";
 
 export type VizType = "table" | "line" | "bar" | "stat";
 
@@ -22,15 +19,11 @@ export type DashboardCard = {
 type Store = { cards: DashboardCard[] };
 
 async function readStore(): Promise<Store> {
-  try {
-    return JSON.parse(await fs.readFile(FILE, "utf8"));
-  } catch {
-    return { cards: [] };
-  }
+  return readBlob<Store>(KEY, { cards: [] });
 }
 
 async function writeStore(store: Store): Promise<void> {
-  await fs.writeFile(FILE, JSON.stringify(store, null, 2));
+  await writeBlob(KEY, store);
 }
 
 export async function listCards(): Promise<DashboardCard[]> {

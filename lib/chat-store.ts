@@ -1,12 +1,7 @@
-import { promises as fs } from "fs";
-import path from "path";
 import crypto from "crypto";
+import { readBlob, writeBlob } from "@/lib/kv";
 
-// Skeleton storage: a JSON file on disk. Works for local dev only —
-// swap for a database before deploying (serverless filesystems are ephemeral).
-// Stored server-side (not per-browser) so the same conversation is visible
-// from every device that opens the app.
-const FILE = path.join(process.cwd(), ".chats.json");
+const KEY = "arnold:chats";
 
 export type StoredPart =
   | { type: "thinking"; text: string }
@@ -35,15 +30,11 @@ function nowISO(): string {
 }
 
 async function readStore(): Promise<Store> {
-  try {
-    return JSON.parse(await fs.readFile(FILE, "utf8"));
-  } catch {
-    return { conversations: [] };
-  }
+  return readBlob<Store>(KEY, { conversations: [] });
 }
 
 async function writeStore(store: Store): Promise<void> {
-  await fs.writeFile(FILE, JSON.stringify(store, null, 2));
+  await writeBlob(KEY, store);
 }
 
 async function ensureGeneral(store: Store): Promise<Conversation> {

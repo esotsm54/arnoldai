@@ -1,21 +1,14 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { readBlob, writeBlob } from "@/lib/kv";
 import type { PushSubscription } from "web-push";
 
-// Skeleton storage: a JSON file on disk. Works for local dev only —
-// swap for a database before deploying (serverless filesystems are ephemeral).
-const FILE = path.join(process.cwd(), ".subscriptions.json");
+const KEY = "arnold:push-subscriptions";
 
 async function readAll(): Promise<PushSubscription[]> {
-  try {
-    return JSON.parse(await fs.readFile(FILE, "utf8"));
-  } catch {
-    return [];
-  }
+  return readBlob<PushSubscription[]>(KEY, []);
 }
 
 async function writeAll(subs: PushSubscription[]): Promise<void> {
-  await fs.writeFile(FILE, JSON.stringify(subs, null, 2));
+  await writeBlob(KEY, subs);
 }
 
 export async function getSubscriptions(): Promise<PushSubscription[]> {
