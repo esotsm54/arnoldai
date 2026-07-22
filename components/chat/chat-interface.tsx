@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Markdown } from "./markdown";
 
 // Assistant turns are a sequence of parts (thinking, actions, text) as
 // streamed live from /api/ai/chat — thinking is the model's real reasoning
@@ -83,8 +84,8 @@ function AssistantParts({ msg }: { msg: Extract<Message, { role: "assistant" }> 
           );
         }
         return (
-          <div key={i} className="rounded-2xl rounded-tl-md bg-white ring-1 ring-black/5 px-4 py-2.5 text-sm text-slate-800 whitespace-pre-wrap">
-            {part.text}
+          <div key={i} className="max-w-full rounded-2xl rounded-tl-md bg-white ring-1 ring-black/5 px-4 py-2.5 text-sm text-slate-800">
+            <Markdown text={part.text} />
           </div>
         );
       })}
