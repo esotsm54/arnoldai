@@ -1,5 +1,10 @@
 import { apiFetch } from "@/lib/api-client";
-import { computeDailySummaries } from "@/lib/deficit";
+import {
+  computeDailySummaries,
+  computeTdee,
+  latestWeightKg,
+  type ProfileInfo,
+} from "@/lib/deficit";
 
 export type ToolDef = {
   name: string;
@@ -112,7 +117,7 @@ export const READ_ONLY_TOOLS: ToolDef[] = [
   {
     name: "get_daily_summary",
     description:
-      "Get precomputed daily totals for each day that has any food or exercise logged: eaten, burned, deficit (TDEE 2730 + burned − eaten), AND cumulativeDeficit — the running total of deficit from the earliest logged day through that day (i.e. total calories banked to date). ALWAYS use these numbers as-is instead of summing food_log/exercise entries, computing the deficit formula, or adding up multiple days' deficits yourself — every value here, including the running total, is computed in code, not by you, so it cannot contain an arithmetic mistake. Provide a date (YYYY-MM-DD) for one day; pass null for every day.",
+      "Get precomputed daily totals for each day that has any food or exercise logged: eaten, burned, deficit (tdee + burned − eaten), AND cumulativeDeficit — the running total of deficit from the earliest logged day through that day (i.e. total calories banked to date). The response also includes the tdee used, computed in code via Mifflin-St Jeor from the user's profile and latest recorded weight (it re-adjusts automatically when a new weight is logged). ALWAYS use these numbers as-is instead of summing food_log/exercise entries, computing TDEE or the deficit formula, or adding up multiple days' deficits yourself — every value here is computed in code, not by you, so it cannot contain an arithmetic mistake. Provide a date (YYYY-MM-DD) for one day; pass null for every day.",
     parameters: {
       type: "object",
       properties: {
@@ -122,13 +127,16 @@ export const READ_ONLY_TOOLS: ToolDef[] = [
       additionalProperties: false,
     },
     execute: async (args) => {
-      const [logs, exercises] = await Promise.all([
+      const [logs, exercises, profile, body] = await Promise.all([
         apiFetch<Array<{ date: string; calories: string }>>("/log"),
         apiFetch<Array<{ date: string; caloriesBurned: string }>>("/exercise"),
+        apiFetch<ProfileInfo>("/user-info").catch(() => null),
+        apiFetch<Array<{ day: string; weightKg: string | null }>>("/body").catch(() => []),
       ]);
-      const summaries = computeDailySummaries(logs, exercises);
+      const tdee = computeTdee(profile, latestWeightKg(body));
+      const summaries = computeDailySummaries(logs, exercises, tdee);
       const date = str(args, "date");
-      return date ? summaries.filter((s) => s.date === date) : summaries;
+      return { tdee, days: date ? summaries.filter((s) => s.date === date) : summaries };
     },
     label: (args) => {
       const date = str(args, "date");

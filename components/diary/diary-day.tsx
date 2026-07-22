@@ -12,9 +12,7 @@ import { FoodLogFormModal } from "./food-log-form";
 import { ExerciseFormModal } from "./exercise-form";
 import type { LogEntry, ExerciseEntry } from "./types";
 import { toNum } from "./types";
-
-// Base TDEE from the user's personal rules; daily deficit = TDEE + burned - eaten
-const BASE_TDEE = 2730;
+import { BASE_TDEE, computeTdee, latestWeightKg, type ProfileInfo } from "@/lib/deficit";
 
 const MEAL_ORDER: { type: LogEntry["mealType"]; label: string }[] = [
   { type: "breakfast", label: "Breakfast" },
@@ -73,17 +71,26 @@ export function DiaryDay() {
   const [exercises, setExercises] = useState<ExerciseEntry[] | null>(null);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>(null);
+  const [tdee, setTdee] = useState(BASE_TDEE);
   const summaryRef = useRef<HTMLElement>(null);
 
   async function load() {
     try {
-      const [logRes, exRes] = await Promise.all([
+      const [logRes, exRes, profileRes, bodyRes] = await Promise.all([
         fetch("/api/arnold/log"),
         fetch("/api/arnold/exercise"),
+        fetch("/api/profile"),
+        fetch("/api/arnold/body"),
       ]);
       if (!logRes.ok || !exRes.ok) throw new Error("Could not load diary data");
       setLogs(await logRes.json());
       setExercises(await exRes.json());
+      // TDEE inputs are best-effort — the diary still works on the fallback
+      const profile: ProfileInfo | null = profileRes.ok ? await profileRes.json() : null;
+      const body: Array<{ day: string; weightKg: string | null }> = bodyRes.ok
+        ? await bodyRes.json()
+        : [];
+      setTdee(computeTdee(profile, latestWeightKg(body)));
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load diary data");
@@ -105,7 +112,7 @@ export function DiaryDay() {
 
   const eaten = dayLogs.reduce((s, l) => s + toNum(l.calories), 0);
   const burned = dayExercises.reduce((s, e) => s + toNum(e.caloriesBurned), 0);
-  const deficit = BASE_TDEE + burned - eaten;
+  const deficit = tdee + burned - eaten;
   const protein = dayLogs.reduce((s, l) => s + toNum(l.protein), 0);
   const fat = dayLogs.reduce((s, l) => s + toNum(l.fat), 0);
   const carbs = dayLogs.reduce((s, l) => s + toNum(l.carbohydrates), 0);
@@ -131,10 +138,10 @@ export function DiaryDay() {
       .map(([day, totals]) => ({
         day,
         ...totals,
-        banked: BASE_TDEE + totals.burned - totals.eaten,
+        banked: tdee + totals.burned - totals.eaten,
       }))
       .sort((a, b) => b.day.localeCompare(a.day));
-  }, [logs, exercises]);
+  }, [logs, exercises, tdee]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -200,7 +207,7 @@ export function DiaryDay() {
                 <p className={`text-2xl font-bold ${deficit >= 0 ? "text-[#006300]" : "text-red-500"}`}>
                   {Math.round(deficit)}
                 </p>
-                <p className="text-xs text-slate-400">kcal (TDEE {BASE_TDEE})</p>
+                <p className="text-xs text-slate-400">kcal (TDEE {tdee})</p>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-4 gap-3 border-t border-black/5 pt-3">

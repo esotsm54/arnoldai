@@ -36,13 +36,17 @@ export async function POST(request: Request) {
   }\n\nToday's date is ${todayISO()} (YYYY-MM-DD). You can read and write the user's data (diary, exercise, food library, body measurements, profile) through your tools. Only call a create/update/delete tool when the user's request clearly asks for that change — look up ids with the matching read tool first, and never guess an id. Confirm what you did afterward in plain language. For anything involving calorie deficit/surplus, daily totals, or a running/cumulative total across days, ALWAYS call get_daily_summary and use its eaten/burned/deficit/cumulativeDeficit fields as-is — never sum entries or add up multiple days yourself.\n\nThis chat interface renders GitHub-flavored Markdown. For tabular data, use REAL Markdown table syntax (a header row, then a |---|---| separator row, then data rows) — never pipe-separated bullet lists pretending to be tables. Bold, lists, and short headings are also rendered.`;
 
   const openai = new OpenAI({ apiKey });
-  const tools = ALL_TOOLS.map(({ name, description, parameters }) => ({
-    type: "function" as const,
-    name,
-    description,
-    parameters,
-    strict: true,
-  }));
+  const tools = [
+    ...ALL_TOOLS.map(({ name, description, parameters }) => ({
+      type: "function" as const,
+      name,
+      description,
+      parameters,
+      strict: true,
+    })),
+    // OpenAI-hosted web search — executed on their side, no output replay needed.
+    { type: "web_search" as const },
+  ];
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -77,6 +81,8 @@ export async function POST(request: Request) {
               send({ type: "thinking_delta", text: event.delta });
             } else if (event.type === "response.output_text.delta") {
               send({ type: "text_delta", text: event.delta });
+            } else if (event.type === "response.web_search_call.searching") {
+              send({ type: "action", label: "Buscando en la web" });
             }
           }
 
