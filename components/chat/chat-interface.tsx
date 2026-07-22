@@ -98,19 +98,56 @@ function AssistantParts({ msg }: { msg: Extract<Message, { role: "assistant" }> 
   );
 }
 
-export function ChatInterface() {
+export function ChatInterface({ conversationId }: { conversationId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const justLoadedRef = useRef(false);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
+
+  // Load this conversation's history from the server — it's stored there
+  // (not per-browser) so it's the same conversation from any device.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch(`/api/chats/${conversationId}`)
+      .then((r) => (r.ok ? r.json() : { messages: [] }))
+      .then((conv) => {
+        if (cancelled) return;
+        justLoadedRef.current = true;
+        setMessages(conv.messages ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId]);
+
+  // Persist once a turn has settled — not on the initial load, not mid-stream.
+  useEffect(() => {
+    if (loading || busy) return;
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
+      return;
+    }
+    fetch(`/api/chats/${conversationId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+    }).catch(() => {});
+  }, [messages, busy, loading, conversationId]);
 
   function updateLastAssistant(update: (msg: Extract<Message, { role: "assistant" }>) => Message) {
     setMessages((prev) => {
@@ -245,7 +282,8 @@ export function ChatInterface() {
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm p-4 flex flex-col gap-4"
       >
-        {messages.length === 0 && (
+        {loading && <p className="m-auto text-sm text-slate-400">Loading conversation…</p>}
+        {!loading && messages.length === 0 && (
           <p className="m-auto text-sm text-slate-400">Ask Arnold something…</p>
         )}
         {messages.map((msg, i) =>

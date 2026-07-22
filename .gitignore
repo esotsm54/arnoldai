@@ -40,6 +40,9 @@ yarn-error.log*
 # local GPT/assistant config store (dev only)
 .gpt-config.json
 
+# local chat conversation store (dev only)
+.chats.json
+
 # vercel
 .vercel
 
