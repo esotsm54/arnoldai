@@ -43,6 +43,9 @@ yarn-error.log*
 # local chat conversation store (dev only)
 .chats.json
 
+# local dashboard AI-card store (dev only)
+.dashboard-cards.json
+
 # vercel
 .vercel
 

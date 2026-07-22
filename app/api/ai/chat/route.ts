@@ -5,18 +5,12 @@ import type {
 } from "openai/resources/responses/responses";
 import { getGptConfig } from "@/lib/gpt-config-store";
 import { ALL_TOOLS } from "@/lib/ai-tools";
+import { todayISO } from "@/lib/today";
 
 // Small, cheap reasoning model — swap for "gpt-5" or "gpt-5.1" for more
 // capability at higher cost/latency.
 const MODEL = "gpt-5-mini";
 const MAX_TOOL_ITERATIONS = 6;
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
 
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -39,7 +33,7 @@ export async function POST(request: Request) {
   const { instructions: savedInstructions } = await getGptConfig();
   const instructions = `${
     savedInstructions || "You are Arnold, a helpful nutrition and fitness assistant."
-  }\n\nToday's date is ${todayISO()} (YYYY-MM-DD). You can read and write the user's data (diary, exercise, food library, body measurements, profile) through your tools. Only call a create/update/delete tool when the user's request clearly asks for that change — look up ids with the matching read tool first, and never guess an id. Confirm what you did afterward in plain language.`;
+  }\n\nToday's date is ${todayISO()} (YYYY-MM-DD). You can read and write the user's data (diary, exercise, food library, body measurements, profile) through your tools. Only call a create/update/delete tool when the user's request clearly asks for that change — look up ids with the matching read tool first, and never guess an id. Confirm what you did afterward in plain language. For anything involving calorie deficit/surplus or daily totals, ALWAYS call get_daily_summary instead of summing entries and computing the formula yourself.`;
 
   const openai = new OpenAI({ apiKey });
   const tools = ALL_TOOLS.map(({ name, description, parameters }) => ({

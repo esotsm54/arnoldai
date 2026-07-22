@@ -3,6 +3,7 @@ import {
   ActivityLineChart,
   SessionsBarChart,
 } from "@/components/dashboard-charts";
+import { AiCardsSection } from "@/components/dashboard/ai-cards-section";
 
 export default function DashboardPage() {
   return (
@@ -11,6 +12,9 @@ export default function DashboardPage() {
       <StatTiles />
       <ActivityLineChart />
       <SessionsBarChart />
+      <div className="mt-2">
+        <AiCardsSection />
+      </div>
     </div>
   );
 }

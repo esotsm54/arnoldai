@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api-client";
+import { computeDailySummaries } from "@/lib/deficit";
 
 export type ToolDef = {
   name: string;
@@ -107,6 +108,32 @@ export const READ_ONLY_TOOLS: ToolDef[] = [
     parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
     execute: () => apiFetch("/body"),
     label: () => "Reading weight & body measurements",
+  },
+  {
+    name: "get_daily_summary",
+    description:
+      "Get precomputed daily totals — calories eaten, calories burned, and the deficit (TDEE 2730 + burned − eaten) — for each day that has any food or exercise logged. ALWAYS use this instead of summing food_log/exercise entries and doing the deficit math yourself: the numbers here are computed in code, not by you, so they cannot contain an arithmetic mistake. Provide a date (YYYY-MM-DD) for one day; pass null for every day.",
+    parameters: {
+      type: "object",
+      properties: {
+        date: { ...nullableString, description: "YYYY-MM-DD. Pass null for every day." },
+      },
+      required: ["date"],
+      additionalProperties: false,
+    },
+    execute: async (args) => {
+      const [logs, exercises] = await Promise.all([
+        apiFetch<Array<{ date: string; calories: string }>>("/log"),
+        apiFetch<Array<{ date: string; caloriesBurned: string }>>("/exercise"),
+      ]);
+      const summaries = computeDailySummaries(logs, exercises);
+      const date = str(args, "date");
+      return date ? summaries.filter((s) => s.date === date) : summaries;
+    },
+    label: (args) => {
+      const date = str(args, "date");
+      return date ? `Computing daily summary for ${date}` : "Computing daily summaries";
+    },
   },
 ];
 
