@@ -1,5 +1,6 @@
 import { PushManager } from "@/components/push-manager";
 import { ProfileForm } from "@/components/profile-form";
+import { AssistantPromptForm } from "@/components/assistant-prompt-form";
 
 export default function SettingsPage() {
   return (
@@ -12,6 +13,15 @@ export default function SettingsPage() {
         </p>
         <div className="mt-4">
           <ProfileForm />
+        </div>
+      </section>
+      <section className="mt-6 rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-slate-900">Assistant prompt</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Instructions sent to Arnold on every chat message.
+        </p>
+        <div className="mt-4">
+          <AssistantPromptForm />
         </div>
       </section>
       <section className="mt-6 rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm p-6">

@@ -37,6 +37,9 @@ yarn-error.log*
 # local push subscription store (dev only)
 .subscriptions.json
 
+# local GPT/assistant config store (dev only)
+.gpt-config.json
+
 # vercel
 .vercel
 
