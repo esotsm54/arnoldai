@@ -10,9 +10,22 @@ type Part =
   | { type: "action"; label: string }
   | { type: "text"; text: string };
 
+type Attachment = { name: string; kind: "image" | "document"; dataUrl?: string };
+
 type Message =
-  | { role: "user"; text: string; attachments?: string[] }
+  | { role: "user"; text: string; attachments?: Attachment[] }
   | { role: "assistant"; parts: Part[]; pending?: boolean };
+
+// Images are sent to the model as input_image parts; documents are still
+// just a visual chip for now — their contents aren't read or transmitted.
+function buildContent(text: string, attachments?: Attachment[]) {
+  const images = (attachments ?? []).filter((a) => a.kind === "image" && a.dataUrl);
+  if (images.length === 0) return text;
+  return [
+    { type: "input_text", text },
+    ...images.map((img) => ({ type: "input_image", image_url: img.dataUrl, detail: "auto" })),
+  ];
+}
 
 const ATTACH_OPTIONS = [
   { id: "image", label: "Image", accept: "image/*", capture: false },
@@ -88,7 +101,7 @@ function AssistantParts({ msg }: { msg: Extract<Message, { role: "assistant" }> 
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,10 +140,10 @@ export function ChatInterface() {
     if ((!text && attachments.length === 0) || busy) return;
     setBusy(true);
 
-    // Attachments aren't sent to the model yet — only the text goes through.
+    const currentAttachments = attachments;
     const apiHistory = messages.map((m) =>
       m.role === "user"
-        ? { role: "user" as const, content: m.text }
+        ? { role: "user" as const, content: buildContent(m.text, m.attachments) }
         : {
             role: "assistant" as const,
             content: m.parts
@@ -154,7 +167,10 @@ export function ChatInterface() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...apiHistory, { role: "user", content: text }],
+          messages: [
+            ...apiHistory,
+            { role: "user", content: buildContent(text, currentAttachments) },
+          ],
         }),
       });
       if (!res.ok || !res.body) {
@@ -203,11 +219,23 @@ export function ChatInterface() {
     }
   }
 
-  function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const names = [...(e.target.files ?? [])].map((f) => f.name);
-    if (names.length) setAttachments((prev) => [...prev, ...names]);
+  async function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = [...(e.target.files ?? [])];
     e.target.value = "";
     setMenuOpen(false);
+    for (const file of files) {
+      if (file.type.startsWith("image/")) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+        setAttachments((prev) => [...prev, { name: file.name, kind: "image", dataUrl }]);
+      } else {
+        setAttachments((prev) => [...prev, { name: file.name, kind: "document" }]);
+      }
+    }
   }
 
   return (
@@ -223,14 +251,24 @@ export function ChatInterface() {
         {messages.map((msg, i) =>
           msg.role === "user" ? (
             <div key={i} className="self-end max-w-[85%] flex flex-col items-end gap-1">
-              {msg.attachments?.map((name) => (
-                <span key={name} className="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-2.5 py-1 text-xs text-slate-600">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-                    <path d="M21 12.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8L13 5a3.7 3.7 0 0 1 5.2 5.2l-8.2 8.2a1.8 1.8 0 0 1-2.6-2.6L15 8.3" />
-                  </svg>
-                  {name}
-                </span>
-              ))}
+              {msg.attachments?.map((att, idx) =>
+                att.kind === "image" && att.dataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- data URL preview, not an optimizable asset
+                  <img
+                    key={idx}
+                    src={att.dataUrl}
+                    alt={att.name}
+                    className="max-h-40 max-w-[200px] rounded-2xl object-cover ring-1 ring-black/10"
+                  />
+                ) : (
+                  <span key={idx} className="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-2.5 py-1 text-xs text-slate-600">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                      <path d="M21 12.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8L13 5a3.7 3.7 0 0 1 5.2 5.2l-8.2 8.2a1.8 1.8 0 0 1-2.6-2.6L15 8.3" />
+                    </svg>
+                    {att.name}
+                  </span>
+                )
+              )}
               {msg.text && (
                 <div className="rounded-2xl rounded-tr-md bg-slate-900 text-white px-4 py-2.5 text-sm whitespace-pre-wrap">
                   {msg.text}
@@ -246,12 +284,16 @@ export function ChatInterface() {
       {/* Attachment chips */}
       {attachments.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
-          {attachments.map((name, i) => (
-            <span key={`${name}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-xs text-slate-700">
-              {name}
+          {attachments.map((att, i) => (
+            <span key={`${att.name}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-white/80 ring-1 ring-black/10 pl-1.5 pr-3 py-1.5 text-xs text-slate-700">
+              {att.kind === "image" && att.dataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL preview, not an optimizable asset
+                <img src={att.dataUrl} alt={att.name} className="h-6 w-6 rounded-full object-cover" />
+              ) : null}
+              {att.name}
               <button
                 type="button"
-                aria-label={`Remove ${name}`}
+                aria-label={`Remove ${att.name}`}
                 onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
                 className="text-slate-400 hover:text-slate-700"
               >

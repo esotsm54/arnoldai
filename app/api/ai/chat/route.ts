@@ -4,7 +4,7 @@ import type {
   ResponseInputItem,
 } from "openai/resources/responses/responses";
 import { getGptConfig } from "@/lib/gpt-config-store";
-import { READ_ONLY_TOOLS } from "@/lib/ai-tools";
+import { ALL_TOOLS } from "@/lib/ai-tools";
 
 // Small, cheap reasoning model — swap for "gpt-5" or "gpt-5.1" for more
 // capability at higher cost/latency.
@@ -39,10 +39,10 @@ export async function POST(request: Request) {
   const { instructions: savedInstructions } = await getGptConfig();
   const instructions = `${
     savedInstructions || "You are Arnold, a helpful nutrition and fitness assistant."
-  }\n\nToday's date is ${todayISO()} (YYYY-MM-DD). You can only read the user's data — you have no tools to add, edit, or delete anything, so never claim to have changed something.`;
+  }\n\nToday's date is ${todayISO()} (YYYY-MM-DD). You can read and write the user's data (diary, exercise, food library, body measurements, profile) through your tools. Only call a create/update/delete tool when the user's request clearly asks for that change — look up ids with the matching read tool first, and never guess an id. Confirm what you did afterward in plain language.`;
 
   const openai = new OpenAI({ apiKey });
-  const tools = READ_ONLY_TOOLS.map(({ name, description, parameters }) => ({
+  const tools = ALL_TOOLS.map(({ name, description, parameters }) => ({
     type: "function" as const,
     name,
     description,
@@ -59,11 +59,11 @@ export async function POST(request: Request) {
 
       try {
         const input: ResponseInputItem[] = messages.map(
-          (m: { role: string; content: string }) => ({
+          (m: { role: string; content: unknown }) => ({
             role: m.role === "assistant" ? "assistant" : "user",
             content: m.content,
           })
-        );
+        ) as ResponseInputItem[];
 
         for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
           const responseStream = openai.responses.stream({
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
             });
           }
           for (const call of functionCalls) {
-            const tool = READ_ONLY_TOOLS.find((t) => t.name === call.name);
+            const tool = ALL_TOOLS.find((t) => t.name === call.name);
             let args: Record<string, unknown> = {};
             try {
               args = JSON.parse(call.arguments || "{}");
@@ -113,7 +113,10 @@ export async function POST(request: Request) {
             send({ type: "action", label: tool ? tool.label(args) : `Running ${call.name}` });
             let output: string;
             try {
-              output = JSON.stringify(tool ? await tool.execute(args) : { error: "Unknown tool" });
+              const result = tool ? await tool.execute(args) : { error: "Unknown tool" };
+              // Some calls (e.g. a successful DELETE) return no body; JSON.stringify(undefined)
+              // yields the JS value undefined, which would silently drop the "output" field.
+              output = JSON.stringify(result === undefined ? { success: true } : result);
             } catch (err) {
               output = JSON.stringify({
                 error: err instanceof Error ? err.message : "Tool failed",

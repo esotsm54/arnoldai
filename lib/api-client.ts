@@ -28,7 +28,9 @@ export async function apiFetch<T>(
   if (!res.ok) {
     throw new ApiError(res.status, `API request failed: ${res.status} ${path}`);
   }
-  return res.json() as Promise<T>;
+  // DELETE and some updates return 204/empty bodies — res.json() would throw on those.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 // Example endpoint wrapper — replace with real endpoints:
