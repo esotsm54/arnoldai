@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       };
 
       try {
-        let input: ResponseInputItem[] = messages.map(
+        const input: ResponseInputItem[] = messages.map(
           (m: { role: string; content: string }) => ({
             role: m.role === "assistant" ? "assistant" : "user",
             content: m.content,
@@ -92,7 +92,16 @@ export async function POST(request: Request) {
             return;
           }
 
-          input = [...input, ...(final.output as unknown as ResponseInputItem[])];
+          // Replay only clean function_call items — the SDK's parsed helper
+          // adds a `parsed_arguments` field that the API rejects on replay.
+          for (const call of functionCalls) {
+            input.push({
+              type: "function_call",
+              call_id: call.call_id,
+              name: call.name,
+              arguments: call.arguments,
+            });
+          }
           for (const call of functionCalls) {
             const tool = READ_ONLY_TOOLS.find((t) => t.name === call.name);
             let args: Record<string, unknown> = {};
