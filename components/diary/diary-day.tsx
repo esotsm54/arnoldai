@@ -113,7 +113,8 @@ export function DiaryDay() {
 
   const loading = (!logs || !exercises) && !error;
 
-  // Every date with at least one food or exercise entry, newest first
+  // Every date with at least one food or exercise entry, newest first.
+  // "Banked" is the day's deficit (TDEE + burned - eaten), same formula as the summary.
   const history = useMemo(() => {
     const days = new Map<string, { eaten: number; burned: number }>();
     for (const l of logs ?? []) {
@@ -127,7 +128,11 @@ export function DiaryDay() {
       days.set(e.date, d);
     }
     return [...days.entries()]
-      .map(([day, totals]) => ({ day, ...totals }))
+      .map(([day, totals]) => ({
+        day,
+        ...totals,
+        banked: BASE_TDEE + totals.burned - totals.eaten,
+      }))
       .sort((a, b) => b.day.localeCompare(a.day));
   }, [logs, exercises]);
 
@@ -295,8 +300,8 @@ export function DiaryDay() {
               <div className="mt-3 flex gap-8 border-b border-black/5 pb-3">
                 <div>
                   <p className="text-xs text-slate-500">Total banked</p>
-                  <p className="text-lg font-bold text-slate-900">
-                    {Math.round(history.reduce((s, h) => s + h.eaten, 0))}{" "}
+                  <p className="text-lg font-bold text-[#006300]">
+                    {Math.round(history.reduce((s, h) => s + h.banked, 0))}{" "}
                     <span className="text-xs font-normal text-slate-400">kcal</span>
                   </p>
                 </div>
@@ -327,11 +332,15 @@ export function DiaryDay() {
                       <p className="text-xs font-medium text-slate-500">
                         {shortDate(h.day)}
                       </p>
-                      <p className="mt-0.5 text-sm font-semibold text-slate-900">
-                        {Math.round(h.eaten)} kcal
+                      <p
+                        className={`mt-0.5 text-sm font-semibold ${
+                          h.banked >= 0 ? "text-[#006300]" : "text-red-500"
+                        }`}
+                      >
+                        {Math.round(h.banked)} kcal
                       </p>
                       {h.burned > 0 && (
-                        <p className="text-xs text-[#006300]">
+                        <p className="text-xs text-slate-500">
                           {Math.round(h.burned)} burned
                         </p>
                       )}
