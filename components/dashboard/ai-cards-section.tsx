@@ -82,8 +82,9 @@ export function AiCardsSection() {
   }
 
   async function deleteCard(id: string) {
+    await fetch(`/api/dashboard-cards/${id}`, { method: "DELETE" });
     setCards((prev) => (prev ?? []).filter((c) => c.id !== id));
-    await fetch(`/api/dashboard-cards/${id}`, { method: "DELETE" }).catch(() => {});
+    setView(null);
   }
 
   function moveCard(id: string, direction: "up" | "down") {
@@ -146,7 +147,6 @@ export function AiCardsSection() {
               onMoveDown={() => moveCard(card.id, "down")}
               onEdit={() => setView({ mode: "edit", card })}
               onRefresh={() => refreshOne(card.id)}
-              onDelete={() => deleteCard(card.id)}
             />
           ))}
         </div>
@@ -160,6 +160,7 @@ export function AiCardsSection() {
           initial={view.card}
           onClose={() => setView(null)}
           onSaved={(fields) => editCard(view.card.id, fields)}
+          onDelete={() => deleteCard(view.card.id)}
         />
       )}
     </div>

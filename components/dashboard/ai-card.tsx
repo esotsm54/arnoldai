@@ -79,14 +79,6 @@ function RefreshIcon() {
   );
 }
 
-function TrashIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
-      <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
-    </svg>
-  );
-}
-
 function CardBody({ card }: { card: DashboardCard }) {
   if (!card.data) {
     return (
@@ -120,7 +112,6 @@ export function AiCard({
   onMoveDown,
   onEdit,
   onRefresh,
-  onDelete,
 }: {
   card: DashboardCard;
   refreshing: boolean;
@@ -130,7 +121,6 @@ export function AiCard({
   onMoveDown: () => void;
   onEdit: () => void;
   onRefresh: () => void;
-  onDelete: () => void;
 }) {
   return (
     <section className="rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm p-5">
@@ -147,9 +137,6 @@ export function AiCard({
         </IconButton>
         <IconButton label="Actualizar" onClick={onRefresh} spinning={refreshing}>
           <RefreshIcon />
-        </IconButton>
-        <IconButton label="Eliminar" onClick={onDelete}>
-          <TrashIcon />
         </IconButton>
       </div>
       <div className="mt-2">

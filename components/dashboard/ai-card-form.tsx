@@ -15,16 +15,20 @@ export function AiCardFormModal({
   initial,
   onClose,
   onSaved,
+  onDelete,
 }: {
   initial?: { title: string; prompt: string; vizType: VizType };
   onClose: () => void;
   onSaved: (fields: { title: string; prompt: string; vizType: VizType }) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [prompt, setPrompt] = useState(initial?.prompt ?? "");
   const [vizType, setVizType] = useState<VizType>(initial?.vizType ?? "table");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +43,18 @@ export function AiCardFormModal({
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar");
       setSaving(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo eliminar");
+      setDeleting(false);
+      setConfirmingDelete(false);
     }
   }
 
@@ -88,6 +104,44 @@ export function AiCardFormModal({
           </button>
         </div>
       </form>
+
+      {onDelete && (
+        <div className="mt-5 border-t border-black/5 pt-4">
+          {!confirmingDelete ? (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="text-sm font-medium text-red-500 hover:text-red-600"
+            >
+              Eliminar tarjeta
+            </button>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-slate-700">
+                ¿Seguro que quieres eliminar esta tarjeta? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="rounded-full bg-red-500 text-white px-6 py-2.5 text-sm font-medium hover:bg-red-600 disabled:opacity-50"
+                >
+                  {deleting ? "Eliminando…" : "Sí, eliminar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={deleting}
+                  className={ghostButtonClass}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }
