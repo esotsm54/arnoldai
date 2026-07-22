@@ -23,6 +23,27 @@
   justify-content: center;
 }
 
+/* Thin, rounded scrollbar matching the app's soft slate palette, for
+   scrollable areas (long tables, wide charts) instead of the bulky OS default */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 23, 42, 0.18);
+  border-radius: 9999px;
+}
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(15, 23, 42, 0.32);
+}
+
 body {
   background: linear-gradient(160deg, #e7f0f2 0%, #e9eef4 45%, #eef0ea 100%)
     fixed var(--background);

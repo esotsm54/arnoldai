@@ -158,9 +158,9 @@ export function BarViz({ points }: { points: Point[] }) {
 export function TableViz({ columns, rows }: { columns: string[]; rows: string[][] }) {
   if (rows.length === 0) return <EmptyViz />;
   return (
-    <div className="overflow-x-auto -mx-1">
+    <div className="thin-scroll -mx-1 max-h-72 overflow-y-auto overflow-x-auto">
       <table className="w-full text-sm">
-        <thead>
+        <thead className="sticky top-0 bg-white/90 backdrop-blur-sm">
           <tr className="border-b border-black/5">
             {columns.map((c, i) => (
               <th key={i} className="px-1 py-2 text-left text-xs font-medium text-slate-500 whitespace-nowrap">
