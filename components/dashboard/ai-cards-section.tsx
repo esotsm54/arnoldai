@@ -86,6 +86,23 @@ export function AiCardsSection() {
     await fetch(`/api/dashboard-cards/${id}`, { method: "DELETE" }).catch(() => {});
   }
 
+  function moveCard(id: string, direction: "up" | "down") {
+    setCards((prev) => {
+      if (!prev) return prev;
+      const idx = prev.findIndex((c) => c.id === id);
+      const swapWith = direction === "up" ? idx - 1 : idx + 1;
+      if (idx === -1 || swapWith < 0 || swapWith >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
+      fetch("/api/dashboard-cards/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: next.map((c) => c.id) }),
+      }).catch(() => {});
+      return next;
+    });
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-end gap-2">
@@ -117,12 +134,16 @@ export function AiCardsSection() {
       )}
 
       {cards && cards.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {cards.map((card) => (
+        <div className="flex flex-col gap-4">
+          {cards.map((card, i) => (
             <AiCard
               key={card.id}
               card={card}
               refreshing={refreshingIds.has(card.id)}
+              isFirst={i === 0}
+              isLast={i === cards.length - 1}
+              onMoveUp={() => moveCard(card.id, "up")}
+              onMoveDown={() => moveCard(card.id, "down")}
               onEdit={() => setView({ mode: "edit", card })}
               onRefresh={() => refreshOne(card.id)}
               onDelete={() => deleteCard(card.id)}

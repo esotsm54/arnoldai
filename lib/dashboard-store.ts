@@ -96,6 +96,24 @@ export async function setCardResult(
   return card;
 }
 
+export async function reorderCards(orderedIds: string[]): Promise<DashboardCard[]> {
+  const store = await readStore();
+  const byId = new Map(store.cards.map((c) => [c.id, c]));
+  const reordered: DashboardCard[] = [];
+  for (const id of orderedIds) {
+    const card = byId.get(id);
+    if (card) {
+      reordered.push(card);
+      byId.delete(id);
+    }
+  }
+  // Anything not mentioned (shouldn't normally happen) keeps its relative order at the end.
+  reordered.push(...byId.values());
+  store.cards = reordered;
+  await writeStore(store);
+  return reordered;
+}
+
 export async function deleteCard(id: string): Promise<boolean> {
   const store = await readStore();
   const before = store.cards.length;

@@ -23,20 +23,23 @@ function IconButton({
   label,
   onClick,
   spinning,
+  disabled,
   children,
 }: {
   label: string;
   onClick: () => void;
   spinning?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       title={label}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
     >
       <span className={spinning ? "animate-spin" : ""}>{children}</span>
     </button>
@@ -47,6 +50,22 @@ function EditIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
       <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function ArrowUpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+      <path d="M12 19V5M6 11l6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ArrowDownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+      <path d="M12 5v14M6 13l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -95,33 +114,45 @@ function CardBody({ card }: { card: DashboardCard }) {
 export function AiCard({
   card,
   refreshing,
+  isFirst,
+  isLast,
+  onMoveUp,
+  onMoveDown,
   onEdit,
   onRefresh,
   onDelete,
 }: {
   card: DashboardCard;
   refreshing: boolean;
+  isFirst: boolean;
+  isLast: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onEdit: () => void;
   onRefresh: () => void;
   onDelete: () => void;
 }) {
   return (
     <section className="rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm p-5">
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">{card.title}</h2>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <IconButton label="Editar prompt" onClick={onEdit}>
-            <EditIcon />
-          </IconButton>
-          <IconButton label="Actualizar" onClick={onRefresh} spinning={refreshing}>
-            <RefreshIcon />
-          </IconButton>
-          <IconButton label="Eliminar" onClick={onDelete}>
-            <TrashIcon />
-          </IconButton>
-        </div>
+      <h2 className="text-sm font-semibold text-slate-900">{card.title}</h2>
+      <div className="mt-1 flex items-center justify-end gap-2">
+        <IconButton label="Subir" onClick={onMoveUp} disabled={isFirst}>
+          <ArrowUpIcon />
+        </IconButton>
+        <IconButton label="Bajar" onClick={onMoveDown} disabled={isLast}>
+          <ArrowDownIcon />
+        </IconButton>
+        <IconButton label="Editar prompt" onClick={onEdit}>
+          <EditIcon />
+        </IconButton>
+        <IconButton label="Actualizar" onClick={onRefresh} spinning={refreshing}>
+          <RefreshIcon />
+        </IconButton>
+        <IconButton label="Eliminar" onClick={onDelete}>
+          <TrashIcon />
+        </IconButton>
       </div>
-      <div className="mt-3">
+      <div className="mt-2">
         <CardBody card={card} />
       </div>
       {card.error && <p className="mt-2 text-xs text-red-500">⚠️ {card.error}</p>}
