@@ -72,6 +72,10 @@ export async function POST(request: Request) {
             input,
             reasoning: { effort: "low", summary: "auto" },
             tools,
+            // We replay the whole transcript ourselves each turn (see `input`
+            // above), so nothing depends on OpenAI retaining this response —
+            // opt out of their storage/retrieval feature entirely.
+            store: false,
           });
 
           for await (const event of responseStream) {
