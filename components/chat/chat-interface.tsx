@@ -11,7 +11,10 @@ type Part =
   | { type: "action"; label: string }
   | { type: "text"; text: string };
 
-type Attachment = { name: string; kind: "image" | "document"; dataUrl?: string };
+// dataUrl is a small thumbnail (displayed + persisted); sendUrl is the larger
+// compressed version sent to the model, kept only in memory for this session
+// (stripped before saving so Redis writes stay under Upstash's request cap).
+type Attachment = { name: string; kind: "image" | "document"; dataUrl?: string; sendUrl?: string };
 
 type Message =
   | { role: "user"; text: string; attachments?: Attachment[] }
@@ -20,12 +23,34 @@ type Message =
 // Images are sent to the model as input_image parts; documents are still
 // just a visual chip for now — their contents aren't read or transmitted.
 function buildContent(text: string, attachments?: Attachment[]) {
-  const images = (attachments ?? []).filter((a) => a.kind === "image" && a.dataUrl);
+  const images = (attachments ?? []).filter((a) => a.kind === "image" && (a.sendUrl || a.dataUrl));
   if (images.length === 0) return text;
   return [
     { type: "input_text", text },
-    ...images.map((img) => ({ type: "input_image", image_url: img.dataUrl, detail: "auto" })),
+    ...images.map((img) => ({
+      type: "input_image",
+      image_url: img.sendUrl ?? img.dataUrl,
+      detail: "auto",
+    })),
   ];
+}
+
+// Phone photos are several MB; base64 grows them past Vercel's 4.5 MB request
+// cap (observed as 413 FUNCTION_PAYLOAD_TOO_LARGE). Downscale + re-encode as
+// JPEG in the browser before anything leaves the device.
+async function compressImage(file: File): Promise<{ sendUrl: string; thumbUrl: string }> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const scaleTo = (maxEdge: number, quality: number) => {
+    const ratio = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+    canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", quality);
+  };
+  const result = { sendUrl: scaleTo(1024, 0.8), thumbUrl: scaleTo(320, 0.75) };
+  bitmap.close();
+  return result;
 }
 
 const ATTACH_OPTIONS = [
@@ -137,16 +162,30 @@ export function ChatInterface({ conversationId }: { conversationId: string }) {
   }, [conversationId]);
 
   // Persist once a turn has settled — not on the initial load, not mid-stream.
+  // Full-size images (sendUrl) are stripped: only the small thumbnail is stored,
+  // keeping each save well under Upstash's per-request size cap.
   useEffect(() => {
     if (loading || busy) return;
     if (justLoadedRef.current) {
       justLoadedRef.current = false;
       return;
     }
+    const persistable = messages.map((m) =>
+      m.role === "user" && m.attachments
+        ? {
+            ...m,
+            attachments: m.attachments.map((a) => ({
+              name: a.name,
+              kind: a.kind,
+              dataUrl: a.dataUrl,
+            })),
+          }
+        : m
+    );
     fetch(`/api/chats/${conversationId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages: persistable }),
     }).catch(() => {});
   }, [messages, busy, loading, conversationId]);
 
@@ -179,9 +218,26 @@ export function ChatInterface({ conversationId }: { conversationId: string }) {
     setBusy(true);
 
     const currentAttachments = attachments;
-    const apiHistory = messages.map((m) =>
+    // Only the most recent prior user message keeps its images when replaying
+    // history — older ones become text-only so the payload can't grow past
+    // Vercel's request size limit as the conversation accumulates photos.
+    const lastUserIdx = messages.reduce(
+      (last, m, i) => (m.role === "user" ? i : last),
+      -1
+    );
+    const apiHistory = messages.map((m, i) =>
       m.role === "user"
-        ? { role: "user" as const, content: buildContent(m.text, m.attachments) }
+        ? {
+            role: "user" as const,
+            content:
+              i === lastUserIdx
+                ? buildContent(m.text, m.attachments)
+                : buildContent(
+                    m.attachments?.some((a) => a.kind === "image")
+                      ? `${m.text}\n[el usuario adjuntó una imagen en este mensaje; ya no está disponible]`
+                      : m.text
+                  ),
+          }
         : {
             role: "assistant" as const,
             content: m.parts
@@ -263,13 +319,18 @@ export function ChatInterface({ conversationId }: { conversationId: string }) {
     setMenuOpen(false);
     for (const file of files) {
       if (file.type.startsWith("image/")) {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
-        setAttachments((prev) => [...prev, { name: file.name, kind: "image", dataUrl }]);
+        try {
+          const { sendUrl, thumbUrl } = await compressImage(file);
+          setAttachments((prev) => [
+            ...prev,
+            { name: file.name, kind: "image", dataUrl: thumbUrl, sendUrl },
+          ]);
+        } catch {
+          setAttachments((prev) => [
+            ...prev,
+            { name: `${file.name} (no se pudo procesar)`, kind: "document" },
+          ]);
+        }
       } else {
         setAttachments((prev) => [...prev, { name: file.name, kind: "document" }]);
       }
