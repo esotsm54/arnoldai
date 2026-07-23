@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #e9eff1;
+  --background: #f4ede4;
   --foreground: #0f172a;
 }
 
@@ -45,7 +45,7 @@
 }
 
 body {
-  background: linear-gradient(160deg, #e7f0f2 0%, #e9eef4 45%, #eef0ea 100%)
+  background: linear-gradient(160deg, #fbf1e6 0%, #f5ede3 45%, #f2ebe0 100%)
     fixed var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;

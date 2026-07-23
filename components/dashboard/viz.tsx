@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const SERIES = "#2a78d6";
+const SERIES = "#ea580c";
 const GRID = "#e1e0d9";
 const MUTED = "#898781";
 const BASELINE = "#c3c2b7";
@@ -373,11 +373,11 @@ export type StatItem = { label: string; value: string; unit?: string | null };
 export function StatsGridViz({ stats }: { stats: StatItem[] }) {
   if (stats.length === 0) return <EmptyViz />;
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+    <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
       {stats.map((s, i) => {
         const showUnit = s.unit && !s.value.trim().toLowerCase().endsWith(s.unit.trim().toLowerCase());
         return (
-          <div key={i}>
+          <div key={i} className="text-center">
             <p className="text-xl font-bold text-slate-900">
               {s.value} {showUnit && <span className="text-sm font-normal text-slate-400">{s.unit}</span>}
             </p>

@@ -65,16 +65,24 @@ export function FoodLogFormModal({
     setF((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Scales the library food's per-base values to the eaten amount (docs §6)
+  // Scales the library food's per-base values to the eaten amount (docs §6).
+  // `amountStr` is only omitted on the initial pick from the dropdown — once
+  // the user is editing the amount by hand, an empty/zero value means they're
+  // mid-edit (e.g. clearing the field to type a new number), not "use the
+  // food's default portion", so it must not be treated as a fallback trigger.
   function applyLibrary(id: string, amountStr?: string) {
     const food = foods.find((x) => x.id === id);
     if (!food) return;
-    const amount = toNum(amountStr ?? "") || toNum(food.portionAmount);
+    const isDefault = amountStr === undefined;
+    const amount = isDefault ? toNum(food.portionAmount) : toNum(amountStr);
     const factor = amount / toNum(food.baseAmount);
     setF((prev) => ({
       ...prev,
       foodName: food.name,
-      weightAmount: String(amount),
+      // Only stamp a default amount on the initial pick — when called while
+      // the user is typing, the input's own onChange already set the exact
+      // text they typed (including a transient empty string), so leave it.
+      weightAmount: isDefault ? String(amount) : prev.weightAmount,
       weightUnit: food.baseUnit,
       calories: String(round1(toNum(food.calories) * factor)),
       protein: food.protein === null ? "" : String(round1(toNum(food.protein) * factor)),

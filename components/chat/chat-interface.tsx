@@ -102,7 +102,7 @@ function AssistantParts({ msg }: { msg: Extract<Message, { role: "assistant" }> 
         }
         if (part.type === "action") {
           return (
-            <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+            <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 ring-1 ring-orange-200">
               <CheckIcon />
               {part.label}
             </span>
@@ -476,7 +476,7 @@ export function ChatInterface({ conversationId }: { conversationId: string }) {
           type="submit"
           disabled={busy}
           aria-label="Send"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-md shadow-emerald-600/30 disabled:opacity-50"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-md shadow-orange-600/30 disabled:opacity-50"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-5 w-5">
             <path d="M12 19V5M6 11l6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />

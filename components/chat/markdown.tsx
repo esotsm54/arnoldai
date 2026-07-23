@@ -19,7 +19,7 @@ export function Markdown({ text }: { text: string }) {
         h2: ({ children }) => <h3 className="mt-3 mb-1 text-sm font-bold text-slate-900 first:mt-0">{children}</h3>,
         h3: ({ children }) => <h4 className="mt-3 mb-1 text-sm font-semibold text-slate-900 first:mt-0">{children}</h4>,
         a: ({ children, href }) => (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#2a78d6] underline underline-offset-2">
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#ea580c] underline underline-offset-2">
             {children}
           </a>
         ),

@@ -79,7 +79,7 @@ export function AppNav() {
                 key={href}
                 href={href}
                 aria-label={label}
-                className={`-translate-y-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-600/40 ring-4 ring-white/80 transition-transform active:scale-95 ${
+                className={`-translate-y-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-lg shadow-orange-600/40 ring-4 ring-white/80 transition-transform active:scale-95 ${
                   active ? "scale-105" : ""
                 }`}
               >
@@ -95,7 +95,7 @@ export function AppNav() {
               aria-current={active ? "page" : undefined}
               className={`rounded-full p-2.5 transition-colors ${
                 active
-                  ? "text-emerald-600"
+                  ? "text-orange-600"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -125,8 +125,8 @@ export function AppNav() {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 my-1 bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-medium shadow-md shadow-emerald-600/30 transition-transform hover:scale-[1.02] active:scale-95 ${
-                    active ? "ring-2 ring-emerald-300 ring-offset-2 ring-offset-white/60" : ""
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 my-1 bg-gradient-to-br from-orange-400 to-orange-600 text-white font-medium shadow-md shadow-orange-600/30 transition-transform hover:scale-[1.02] active:scale-95 ${
+                    active ? "ring-2 ring-orange-300 ring-offset-2 ring-offset-white/60" : ""
                   }`}
                 >
                   <Icon className="h-5 w-5 shrink-0" />
