@@ -8,7 +8,7 @@ import type { VizType } from "@/lib/dashboard-store";
 const MODEL = "gpt-5-mini";
 const MAX_TOOL_ITERATIONS = 6;
 
-const INSTRUCTIONS = `You answer data queries about the user's nutrition/fitness data using the available read-only tools. Gather whatever data is needed, then respond with ONLY the structured data requested — no prose, no explanations, no extra commentary. Format numbers for display where the schema asks for a string (e.g. "1,489 kcal"), not raw numbers.\n\nFor anything involving calorie deficit/surplus, daily totals, or a running/cumulative total across days, ALWAYS call get_daily_summary and use its eaten/burned/deficit/cumulativeDeficit fields as-is — never sum food_log/exercise entries, compute the deficit formula, or add up multiple days yourself. Any arithmetic you do by hand on this data is assumed wrong; only the tool's numbers are trustworthy.\n\nToday's date is ${todayISO()} (YYYY-MM-DD).`;
+const INSTRUCTIONS = `You answer data queries about the user's nutrition/fitness data using the available read-only tools. Gather whatever data is needed, then respond with ONLY the structured data requested — no prose, no explanations, no extra commentary.\n\nFor table cells (which have no separate unit field), format numbers as display strings with thousand separators and units inline where helpful (e.g. "1,489 kcal"). For a "stat" card, and for each entry of a "stats" card (several numbers in one card, e.g. eaten/burned/deficit side by side), the "value" field and the "unit" field are shown side by side by the UI — put ONLY the formatted number (with thousand separators, no unit word) in "value" (e.g. "1,489"), and put the unit word ONLY in "unit" (e.g. "kcal"). Never repeat the unit in both fields — that renders as "1,489 kcal kcal" on screen. Also never write raw tool/field names (e.g. "cumulativeDeficit", "eaten", "burned") into any visible title, value, or caption — translate them into plain language instead.\n\nFor anything involving calorie deficit/surplus, daily totals, or a running/cumulative total across days, ALWAYS call get_daily_summary and use its eaten/burned/deficit/cumulativeDeficit fields as-is — never sum food_log/exercise entries, compute the deficit formula, or add up multiple days yourself. Any arithmetic you do by hand on this data is assumed wrong; only the tool's numbers are trustworthy.\n\nFor a "combo" card (bar + line series over the same x-axis, all sharing one y-axis in kcal — so only combine series that are directly comparable in kcal): "categories" are the x-axis labels (e.g. dates), in chronological order. "bar" is at most one bar series as {label, values} with one number per category — set it to null if the user didn't ask for bars. "lines" is an array of one or more line series as {label, values}, each with exactly one number per category (e.g. a constant target repeated across every category for a "minimum to save" line, or a rolling/moving average computed from the same per-day numbers — a simple average like this is fine to compute yourself, it is not the deficit formula). Every values array must have the same length as "categories".\n\nToday's date is ${todayISO()} (YYYY-MM-DD).`;
 
 function schemaFor(vizType: VizType): { name: string; schema: Record<string, unknown> } {
   switch (vizType) {
@@ -41,6 +41,56 @@ function schemaFor(vizType: VizType): { name: string; schema: Record<string, unk
           additionalProperties: false,
         },
       };
+    case "stats":
+      return {
+        name: "stats_data",
+        schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            stats: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string" },
+                  value: { type: "string" },
+                  unit: { type: ["string", "null"] },
+                },
+                required: ["label", "value", "unit"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["title", "stats"],
+          additionalProperties: false,
+        },
+      };
+    case "combo": {
+      const series = {
+        type: "object",
+        properties: {
+          label: { type: "string" },
+          values: { type: "array", items: { type: "number" } },
+        },
+        required: ["label", "values"],
+        additionalProperties: false,
+      };
+      return {
+        name: "combo_data",
+        schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            categories: { type: "array", items: { type: "string" } },
+            bar: { ...series, type: ["object", "null"] },
+            lines: { type: "array", items: series },
+          },
+          required: ["title", "categories", "bar", "lines"],
+          additionalProperties: false,
+        },
+      };
+    }
     case "line":
     case "bar":
       return {

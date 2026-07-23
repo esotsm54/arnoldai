@@ -3,7 +3,7 @@ import { readBlob, writeBlob } from "@/lib/kv";
 
 const KEY = "arnold:dashboard-cards";
 
-export type VizType = "table" | "line" | "bar" | "stat";
+export type VizType = "table" | "line" | "bar" | "stat" | "stats" | "combo";
 
 export type DashboardCard = {
   id: string;

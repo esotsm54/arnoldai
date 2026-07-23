@@ -9,6 +9,8 @@ const VIZ_OPTIONS: { value: VizType; label: string }[] = [
   { value: "line", label: "Línea" },
   { value: "bar", label: "Barras" },
   { value: "stat", label: "Número" },
+  { value: "stats", label: "Varios números" },
+  { value: "combo", label: "Combinada (barras + líneas)" },
 ];
 
 export function AiCardFormModal({

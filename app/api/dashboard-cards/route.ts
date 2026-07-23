@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { listCards, createCard, setCardResult, type VizType } from "@/lib/dashboard-store";
 import { runCardQuery } from "@/lib/ai-dashboard";
 
-const VIZ_TYPES: VizType[] = ["table", "line", "bar", "stat"];
+const VIZ_TYPES: VizType[] = ["table", "line", "bar", "stat", "stats", "combo"];
 
 export async function GET() {
   return NextResponse.json(await listCards());

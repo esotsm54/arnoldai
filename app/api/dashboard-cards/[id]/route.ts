@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { updateCard, deleteCard, type VizType } from "@/lib/dashboard-store";
 
-const VIZ_TYPES: VizType[] = ["table", "line", "bar", "stat"];
+const VIZ_TYPES: VizType[] = ["table", "line", "bar", "stat", "stats", "combo"];
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

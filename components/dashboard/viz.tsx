@@ -155,10 +155,170 @@ export function BarViz({ points }: { points: Point[] }) {
   );
 }
 
-export function TableViz({ columns, rows }: { columns: string[]; rows: string[][] }) {
+const LINE_COLORS = ["#e0a83e", "#5fb87a", "#c65b5b", "#8a6fd1"];
+
+export type ComboSeries = { label: string; values: number[] };
+
+function niceDomain(values: number[]): [number, number] {
+  if (values.length === 0) return [0, 1];
+  const min = Math.min(0, ...values);
+  if (min >= 0) return [0, niceMax(values)];
+  const bound = niceMax(values.map(Math.abs));
+  return [-bound, bound];
+}
+
+export function ComboViz({
+  categories,
+  bar,
+  lines,
+}: {
+  categories: string[];
+  bar?: ComboSeries | null;
+  lines: ComboSeries[];
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  if (categories.length === 0) return <EmptyViz />;
+
+  const allValues = [...(bar?.values ?? []), ...lines.flatMap((l) => l.values)];
+  const [domainMin, domainMax] = niceDomain(allValues);
+  const x = (i: number) =>
+    categories.length > 1 ? PAD.left + (i / (categories.length - 1)) * PW : PAD.left + PW / 2;
+  const y = (v: number) => PAD.top + PH - ((v - domainMin) / (domainMax - domainMin)) * PH;
+  const bw = Math.min(28, (PW / categories.length) * 0.6);
+  const barX = (i: number) => PAD.left + (i + 0.5) * (PW / categories.length) - bw / 2;
+  const ticks = [domainMin, domainMin + (domainMax - domainMin) / 2, domainMax];
+  const labelEvery = Math.max(1, Math.ceil(categories.length / 6));
+
+  function onMove(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fx = ((e.clientX - rect.left) / rect.width) * W;
+    const i = Math.round(((fx - PAD.left) / PW) * (categories.length - 1));
+    setHover(Math.max(0, Math.min(categories.length - 1, i)));
+  }
+
+  return (
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+        role="img"
+        aria-label="Combo chart"
+      >
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={PAD.left} x2={PAD.left + PW} y1={y(t)} y2={y(t)} stroke={t === 0 ? BASELINE : GRID} strokeWidth="1" />
+            <text x={PAD.left - 6} y={y(t) + 3} textAnchor="end" fontSize="10" fill={MUTED}>
+              {Math.round(t)}
+            </text>
+          </g>
+        ))}
+        {categories.map((c, i) => i % labelEvery === 0 && (
+          <text key={c + i} x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill={MUTED}>
+            {c}
+          </text>
+        ))}
+        {bar && bar.values.map((v, i) => {
+          const bx = barX(i);
+          const zero = y(0);
+          const top = Math.min(zero, y(v));
+          const h = Math.abs(y(v) - zero);
+          return (
+            <rect
+              key={i}
+              x={bx}
+              y={top}
+              width={bw}
+              height={Math.max(h, 1)}
+              rx={2}
+              fill={SERIES}
+              opacity={hover === null || hover === i ? 0.55 : 0.25}
+            />
+          );
+        })}
+        {lines.map((line, li) => {
+          const color = LINE_COLORS[li % LINE_COLORS.length];
+          const linePoints = line.values.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+          return (
+            <polyline
+              key={line.label}
+              points={linePoints}
+              fill="none"
+              stroke={color}
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          );
+        })}
+        {hover !== null && (
+          <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + PH} stroke={BASELINE} strokeWidth="1" strokeDasharray="3 3" />
+        )}
+        {hover !== null && lines.map((line, li) => (
+          <circle
+            key={line.label}
+            cx={x(hover)}
+            cy={y(line.values[hover])}
+            r="4"
+            fill={LINE_COLORS[li % LINE_COLORS.length]}
+            stroke="#fff"
+            strokeWidth="2"
+          />
+        ))}
+        {hover !== null && bar && (
+          <circle cx={barX(hover) + bw / 2} cy={y(bar.values[hover])} r="4" fill={SERIES} stroke="#fff" strokeWidth="2" />
+        )}
+      </svg>
+      {hover !== null && (
+        <div
+          className="pointer-events-none absolute -top-1 -translate-x-1/2 rounded-lg bg-slate-900 text-white text-xs px-2.5 py-1.5 shadow"
+          style={{ left: `${(x(hover) / W) * 100}%` }}
+        >
+          <p className="opacity-70">{categories[hover]}</p>
+          {bar && (
+            <p>
+              <span className="opacity-70">{bar.label}:</span> <span className="font-semibold">{bar.values[hover]}</span>
+            </p>
+          )}
+          {lines.map((line, li) => (
+            <p key={line.label}>
+              <span style={{ color: LINE_COLORS[li % LINE_COLORS.length] }}>{line.label}:</span>{" "}
+              <span className="font-semibold">{line.values[hover]}</span>
+            </p>
+          ))}
+        </div>
+      )}
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        {bar && (
+          <span className="flex items-center gap-1.5 text-xs text-slate-500">
+            <span className="h-2 w-2 rounded-full" style={{ background: SERIES }} />
+            {bar.label}
+          </span>
+        )}
+        {lines.map((line, li) => (
+          <span key={line.label} className="flex items-center gap-1.5 text-xs text-slate-500">
+            <span className="h-2 w-2 rounded-full" style={{ background: LINE_COLORS[li % LINE_COLORS.length] }} />
+            {line.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function TableViz({
+  columns,
+  rows,
+  expanded,
+}: {
+  columns: string[];
+  rows: string[][];
+  expanded?: boolean;
+}) {
   if (rows.length === 0) return <EmptyViz />;
   return (
-    <div className="thin-scroll -mx-1 max-h-72 overflow-y-auto overflow-x-auto">
+    <div className={`thin-scroll -mx-1 overflow-y-auto overflow-x-auto ${expanded ? "max-h-[70vh]" : "max-h-72"}`}>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-white/90 backdrop-blur-sm">
           <tr className="border-b border-black/5">
@@ -194,12 +354,37 @@ export function StatViz({
   unit?: string | null;
   caption?: string | null;
 }) {
+  // The model occasionally embeds the unit in `value` too (e.g. value:
+  // "1,489 kcal", unit: "kcal") — drop the redundant unit rather than
+  // showing it twice.
+  const showUnit = unit && !value.trim().toLowerCase().endsWith(unit.trim().toLowerCase());
   return (
     <div>
       <p className="text-3xl font-bold text-slate-900">
-        {value} {unit && <span className="text-lg font-normal text-slate-400">{unit}</span>}
+        {value} {showUnit && <span className="text-lg font-normal text-slate-400">{unit}</span>}
       </p>
       {caption && <p className="mt-1 text-xs text-slate-500">{caption}</p>}
+    </div>
+  );
+}
+
+export type StatItem = { label: string; value: string; unit?: string | null };
+
+export function StatsGridViz({ stats }: { stats: StatItem[] }) {
+  if (stats.length === 0) return <EmptyViz />;
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      {stats.map((s, i) => {
+        const showUnit = s.unit && !s.value.trim().toLowerCase().endsWith(s.unit.trim().toLowerCase());
+        return (
+          <div key={i}>
+            <p className="text-xl font-bold text-slate-900">
+              {s.value} {showUnit && <span className="text-sm font-normal text-slate-400">{s.unit}</span>}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">{s.label}</p>
+          </div>
+        );
+      })}
     </div>
   );
 }

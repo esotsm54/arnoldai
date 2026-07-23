@@ -1,11 +1,15 @@
 "use client";
 
-import { LineViz, BarViz, TableViz, StatViz } from "./viz";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { LineViz, BarViz, TableViz, StatViz, StatsGridViz, ComboViz, type StatItem, type ComboSeries } from "./viz";
 import type { DashboardCard } from "@/lib/dashboard-store";
 
 type TableData = { columns: string[]; rows: string[][] };
 type PointsData = { points: { label: string; value: number }[] };
 type StatData = { value: string; unit?: string | null; caption?: string | null };
+type StatsData = { stats: StatItem[] };
+type ComboData = { categories: string[]; bar: ComboSeries | null; lines: ComboSeries[] };
 
 function relativeTime(iso: string | null): string {
   if (!iso) return "Nunca actualizado";
@@ -79,7 +83,23 @@ function RefreshIcon() {
   );
 }
 
-function CardBody({ card }: { card: DashboardCard }) {
+function ExpandIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+      <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
+      <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CardBody({ card, expanded }: { card: DashboardCard; expanded?: boolean }) {
   if (!card.data) {
     return (
       <p className="text-sm text-slate-400">
@@ -89,7 +109,7 @@ function CardBody({ card }: { card: DashboardCard }) {
   }
   if (card.vizType === "table") {
     const { columns, rows } = card.data as TableData;
-    return <TableViz columns={columns ?? []} rows={rows ?? []} />;
+    return <TableViz columns={columns ?? []} rows={rows ?? []} expanded={expanded} />;
   }
   if (card.vizType === "line") {
     const { points } = card.data as PointsData;
@@ -98,6 +118,14 @@ function CardBody({ card }: { card: DashboardCard }) {
   if (card.vizType === "bar") {
     const { points } = card.data as PointsData;
     return <BarViz points={points ?? []} />;
+  }
+  if (card.vizType === "stats") {
+    const { stats } = card.data as StatsData;
+    return <StatsGridViz stats={stats ?? []} />;
+  }
+  if (card.vizType === "combo") {
+    const { categories, bar, lines } = card.data as ComboData;
+    return <ComboViz categories={categories ?? []} bar={bar} lines={lines ?? []} />;
   }
   const { value, unit, caption } = card.data as StatData;
   return <StatViz value={value ?? ""} unit={unit} caption={caption} />;
@@ -122,10 +150,17 @@ export function AiCard({
   onEdit: () => void;
   onRefresh: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <section className="rounded-3xl bg-white/75 backdrop-blur-xl ring-1 ring-black/5 shadow-sm p-5">
       <h2 className="text-sm font-semibold text-slate-900">{card.title}</h2>
-      <div className="mt-1 flex items-center justify-end gap-2">
+      <div className="mt-2">
+        <CardBody card={card} />
+      </div>
+      {card.error && <p className="mt-2 text-xs text-red-500">⚠️ {card.error}</p>}
+      <p className="mt-3 text-xs text-slate-400">{relativeTime(card.updatedAt)}</p>
+      <div className="mt-1 flex items-center justify-between">
         <IconButton label="Subir" onClick={onMoveUp} disabled={isFirst}>
           <ArrowUpIcon />
         </IconButton>
@@ -138,12 +173,39 @@ export function AiCard({
         <IconButton label="Actualizar" onClick={onRefresh} spinning={refreshing}>
           <RefreshIcon />
         </IconButton>
+        <IconButton label="Expandir" onClick={() => setExpanded(true)} disabled={!card.data}>
+          <ExpandIcon />
+        </IconButton>
       </div>
-      <div className="mt-2">
-        <CardBody card={card} />
-      </div>
-      {card.error && <p className="mt-2 text-xs text-red-500">⚠️ {card.error}</p>}
-      <p className="mt-3 text-xs text-slate-400">{relativeTime(card.updatedAt)}</p>
+
+      {expanded &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[60] flex items-stretch justify-center bg-slate-900/40 backdrop-blur-sm p-0 sm:items-center sm:p-6"
+            onClick={() => setExpanded(false)}
+          >
+            <div
+              className="flex h-full w-full flex-col bg-[#f6f8f8] p-6 shadow-xl sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-3xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <h3 className="text-lg font-semibold text-slate-900">{card.title}</h3>
+                <button
+                  onClick={() => setExpanded(false)}
+                  aria-label="Cerrar"
+                  className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+              <div className="mt-4 flex-1 overflow-y-auto">
+                <CardBody card={card} expanded />
+              </div>
+              <p className="mt-3 text-xs text-slate-400">{relativeTime(card.updatedAt)}</p>
+            </div>
+          </div>,
+          document.body
+        )}
     </section>
   );
 }
