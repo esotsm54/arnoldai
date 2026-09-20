@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Modal,
   Field,
   inputClass,
   primaryButtonClass,
   ghostButtonClass,
+  matches,
 } from "@/components/ui";
 import type { Food, LogEntry } from "./types";
 import { toNum } from "./types";
+import type { Recipe } from "@/lib/recipe-store";
 
 const MEALS = [
   { value: "breakfast", label: "Breakfast" },
@@ -22,16 +24,66 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+// Foods and recipes are prefill-able the same way — a recipe just uses its
+// batch totals as the "base amount" (default portion = the whole recipe).
+type LibItem = {
+  id: string;
+  name: string;
+  kind: "food" | "recipe";
+  baseAmount: number;
+  baseUnit: string;
+  portionAmount: number;
+  calories: number;
+  protein: number | null;
+  fat: number | null;
+  carbohydrates: number | null;
+  sodium: number | null;
+};
+
+function libItemFromFood(food: Food): LibItem {
+  return {
+    id: food.id,
+    name: food.name,
+    kind: "food",
+    baseAmount: toNum(food.baseAmount),
+    baseUnit: food.baseUnit,
+    portionAmount: toNum(food.portionAmount),
+    calories: toNum(food.calories),
+    protein: food.protein === null ? null : toNum(food.protein),
+    fat: food.fat === null ? null : toNum(food.fat),
+    carbohydrates: food.carbohydrates === null ? null : toNum(food.carbohydrates),
+    sodium: food.sodium === null ? null : toNum(food.sodium),
+  };
+}
+
+function libItemFromRecipe(recipe: Recipe): LibItem {
+  return {
+    id: recipe.id,
+    name: recipe.name,
+    kind: "recipe",
+    baseAmount: recipe.totalAmount,
+    baseUnit: recipe.totalUnit,
+    portionAmount: recipe.totalAmount,
+    calories: recipe.totalCalories,
+    protein: recipe.totalProtein,
+    fat: recipe.totalFat,
+    carbohydrates: recipe.totalCarbohydrates,
+    sodium: recipe.totalSodium,
+  };
+}
+
 export function FoodLogFormModal({
   initial,
   defaultDate,
   onClose,
   onSaved,
+  onDelete,
 }: {
   initial?: LogEntry;
   defaultDate: string;
   onClose: () => void;
   onSaved: () => void;
+  onDelete?: () => Promise<void>;
 }) {
   const [f, setF] = useState({
     date: initial?.date ?? defaultDate,
@@ -46,17 +98,51 @@ export function FoodLogFormModal({
     sodium: optStr(initial?.sodium),
     notes: initial?.notes ?? "",
   });
-  const [foods, setFoods] = useState<Food[]>([]);
+  const [libItems, setLibItems] = useState<LibItem[]>([]);
   const [libId, setLibId] = useState("");
+  const [libQuery, setLibQuery] = useState("");
+  const [libOpen, setLibOpen] = useState(false);
+  const libBoxRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    fetch("/api/arnold/foods")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Food[]) => {
-        data.sort((a, b) => a.name.localeCompare(b.name));
-        setFoods(data);
+    function onDocClick(e: MouseEvent) {
+      if (libBoxRef.current && !libBoxRef.current.contains(e.target as Node)) {
+        setLibOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const libMatches = libQuery.trim() ? libItems.filter((item) => matches(item.name, libQuery)) : libItems;
+
+  async function confirmDelete() {
+    if (!onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete");
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/arnold/foods").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/recipes").then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([foodsData, recipesData]: [Food[], Recipe[]]) => {
+        const merged = [
+          ...foodsData.map(libItemFromFood),
+          ...recipesData.map(libItemFromRecipe),
+        ].sort((a, b) => a.name.localeCompare(b.name));
+        setLibItems(merged);
       })
       .catch(() => {});
   }, []);
@@ -65,31 +151,31 @@ export function FoodLogFormModal({
     setF((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Scales the library food's per-base values to the eaten amount (docs §6).
-  // `amountStr` is only omitted on the initial pick from the dropdown — once
-  // the user is editing the amount by hand, an empty/zero value means they're
-  // mid-edit (e.g. clearing the field to type a new number), not "use the
-  // food's default portion", so it must not be treated as a fallback trigger.
+  // Scales the library item's (food's or recipe's) per-base values to the
+  // eaten amount (docs §6). `amountStr` is only omitted on the initial pick
+  // from the dropdown — once the user is editing the amount by hand, an
+  // empty/zero value means they're mid-edit (e.g. clearing the field to type
+  // a new number), not "use the default portion", so it must not be treated
+  // as a fallback trigger.
   function applyLibrary(id: string, amountStr?: string) {
-    const food = foods.find((x) => x.id === id);
-    if (!food) return;
+    const item = libItems.find((x) => x.id === id);
+    if (!item) return;
     const isDefault = amountStr === undefined;
-    const amount = isDefault ? toNum(food.portionAmount) : toNum(amountStr);
-    const factor = amount / toNum(food.baseAmount);
+    const amount = isDefault ? item.portionAmount : toNum(amountStr);
+    const factor = item.baseAmount > 0 ? amount / item.baseAmount : 0;
     setF((prev) => ({
       ...prev,
-      foodName: food.name,
+      foodName: item.name,
       // Only stamp a default amount on the initial pick — when called while
       // the user is typing, the input's own onChange already set the exact
       // text they typed (including a transient empty string), so leave it.
       weightAmount: isDefault ? String(amount) : prev.weightAmount,
-      weightUnit: food.baseUnit,
-      calories: String(round1(toNum(food.calories) * factor)),
-      protein: food.protein === null ? "" : String(round1(toNum(food.protein) * factor)),
-      fat: food.fat === null ? "" : String(round1(toNum(food.fat) * factor)),
-      carbohydrates:
-        food.carbohydrates === null ? "" : String(round1(toNum(food.carbohydrates) * factor)),
-      sodium: food.sodium === null ? "" : String(round1(toNum(food.sodium) * factor)),
+      weightUnit: item.baseUnit,
+      calories: String(round1(item.calories * factor)),
+      protein: item.protein === null ? "" : String(round1(item.protein * factor)),
+      fat: item.fat === null ? "" : String(round1(item.fat * factor)),
+      carbohydrates: item.carbohydrates === null ? "" : String(round1(item.carbohydrates * factor)),
+      sodium: item.sodium === null ? "" : String(round1(item.sodium * factor)),
     }));
   }
 
@@ -141,23 +227,49 @@ export function FoodLogFormModal({
   return (
     <Modal title={initial ? "Edit food entry" : "Add food"} onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-4">
-        {foods.length > 0 && (
-          <Field label="Prefill from food library (optional)">
-            <select
-              value={libId}
-              onChange={(e) => {
-                setLibId(e.target.value);
-                if (e.target.value) applyLibrary(e.target.value);
-              }}
-              className={inputClass}
-            >
-              <option value="">— Manual entry —</option>
-              {foods.map((food) => (
-                <option key={food.id} value={food.id}>
-                  {food.name}
-                </option>
-              ))}
-            </select>
+        {libItems.length > 0 && (
+          <Field label="Prefill from food library or a recipe (optional)">
+            <div className="relative" ref={libBoxRef}>
+              <input
+                value={libQuery}
+                onChange={(e) => {
+                  setLibQuery(e.target.value);
+                  setLibOpen(true);
+                  if (libId) setLibId("");
+                }}
+                onFocus={() => setLibOpen(true)}
+                placeholder="Search saved foods or recipes…"
+                className={inputClass}
+              />
+              {libOpen && (
+                <ul className="thin-scroll absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-xl bg-white shadow-lg ring-1 ring-black/10">
+                  {libMatches.length === 0 && (
+                    <li className="px-4 py-2.5 text-sm text-slate-400">No matches.</li>
+                  )}
+                  {libMatches.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLibId(item.id);
+                          setLibQuery(item.name);
+                          setLibOpen(false);
+                          applyLibrary(item.id);
+                        }}
+                        className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm text-slate-800 hover:bg-slate-100"
+                      >
+                        <span className="truncate">{item.name}</span>
+                        {item.kind === "recipe" && (
+                          <span className="shrink-0 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-orange-200">
+                            Recipe
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </Field>
         )}
         <div className="grid grid-cols-2 gap-3">
@@ -225,6 +337,44 @@ export function FoodLogFormModal({
           </button>
         </div>
       </form>
+
+      {onDelete && (
+        <div className="mt-5 border-t border-black/5 pt-4">
+          {!confirmingDelete ? (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="text-sm font-medium text-red-500 hover:text-red-600"
+            >
+              Delete entry
+            </button>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-slate-700">
+                Delete this food entry? This can&apos;t be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="rounded-full bg-red-500 text-white px-6 py-2.5 text-sm font-medium hover:bg-red-600 disabled:opacity-50"
+                >
+                  {deleting ? "Deleting…" : "Yes, delete"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={deleting}
+                  className={ghostButtonClass}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }

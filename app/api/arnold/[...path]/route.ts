@@ -38,6 +38,11 @@ async function proxy(
 
   try {
     const res = await fetch(url, init);
+    // A 204/205/304 response must not carry a body — the Response
+    // constructor throws if given one (e.g. DELETE endpoints return 204).
+    if (res.status === 204 || res.status === 205 || res.status === 304) {
+      return new NextResponse(null, { status: res.status });
+    }
     const text = await res.text();
     return new NextResponse(text || "null", {
       status: res.status,

@@ -13,7 +13,7 @@ import {
   matches,
 } from "@/components/ui";
 
-type Food = {
+export type Food = {
   id: string;
   name: string;
   calories: string;
@@ -135,7 +135,7 @@ export function FoodsPanel() {
   );
 }
 
-function FoodFormModal({
+export function FoodFormModal({
   initial,
   onClose,
   onSaved,

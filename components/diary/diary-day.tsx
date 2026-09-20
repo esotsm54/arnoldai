@@ -394,6 +394,16 @@ export function DiaryDay() {
             setView(null);
             await load();
           }}
+          onDelete={
+            view.entry
+              ? async () => {
+                  const res = await fetch(`/api/arnold/log/${view.entry!.id}`, { method: "DELETE" });
+                  if (!res.ok) throw new Error("Could not delete entry");
+                  setView(null);
+                  await load();
+                }
+              : undefined
+          }
         />
       )}
       {view?.type === "exDetail" && (

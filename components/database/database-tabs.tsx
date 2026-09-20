@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { FoodsPanel } from "./foods-panel";
 import { BodyPanel } from "./body-panel";
+import { RecipesPanel } from "./recipes-panel";
 
 const tabs = [
   { id: "foods", label: "Foods" },
+  { id: "recipes", label: "Recipes" },
   { id: "weight", label: "Weight" },
 ] as const;
 
@@ -31,7 +33,9 @@ export function DatabaseTabs() {
           </button>
         ))}
       </div>
-      {tab === "foods" ? <FoodsPanel /> : <BodyPanel />}
+      {tab === "foods" && <FoodsPanel />}
+      {tab === "recipes" && <RecipesPanel />}
+      {tab === "weight" && <BodyPanel />}
     </div>
   );
 }

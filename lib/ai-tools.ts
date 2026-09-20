@@ -5,6 +5,13 @@ import {
   latestWeightKg,
   type ProfileInfo,
 } from "@/lib/deficit";
+import {
+  listRecipes,
+  createRecipe,
+  updateRecipe,
+  deleteRecipe,
+  type RecipeIngredient,
+} from "@/lib/recipe-store";
 
 export type ToolDef = {
   name: string;
@@ -19,6 +26,69 @@ function str(args: Record<string, unknown>, key: string): string | undefined {
   return typeof v === "string" && v.trim() ? v.trim() : undefined;
 }
 
+// Case- and accent-insensitive matcher, same rule the Database page's search
+// bar uses (components/ui.tsx) — the external API's own /foods/search is a
+// strict match and misses food names typed slightly differently, so
+// find_foods matches locally against the full list instead.
+function fuzzyMatches(haystack: string, query: string): boolean {
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return norm(haystack).includes(norm(query.trim()));
+}
+
+function toNum(value: string | number | null | undefined): number {
+  if (value === null || value === undefined || value === "") return 0;
+  const n = typeof value === "number" ? value : parseFloat(value);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+type FoodRecord = {
+  id: string;
+  name: string;
+  calories: string;
+  baseAmount: string;
+  baseUnit: string;
+  protein: string | null;
+  fat: string | null;
+  carbohydrates: string | null;
+  sodium: string | null;
+};
+
+// Resolves free-text ingredient names against the saved food library (same
+// fuzzy match as find_foods) and computes each ingredient's scaled
+// calories/macros in code — the model only supplies names and amounts.
+async function resolveIngredients(
+  raw: Array<{ foodName: string; amount: number; unit: string | null }>
+): Promise<{ resolved: RecipeIngredient[]; errors: string[] }> {
+  const allFoods = await apiFetch<FoodRecord[]>("/foods");
+  const resolved: RecipeIngredient[] = [];
+  const errors: string[] = [];
+  for (const ing of raw) {
+    const food = allFoods.find((f) => fuzzyMatches(f.name, ing.foodName));
+    if (!food) {
+      errors.push(`No saved food matches "${ing.foodName}" — check find_foods first.`);
+      continue;
+    }
+    const baseAmount = toNum(food.baseAmount);
+    const factor = baseAmount > 0 ? ing.amount / baseAmount : 0;
+    resolved.push({
+      foodId: food.id,
+      foodName: food.name,
+      amount: ing.amount,
+      unit: ing.unit ?? food.baseUnit,
+      calories: round1(toNum(food.calories) * factor),
+      protein: food.protein === null ? null : round1(toNum(food.protein) * factor),
+      fat: food.fat === null ? null : round1(toNum(food.fat) * factor),
+      carbohydrates: food.carbohydrates === null ? null : round1(toNum(food.carbohydrates) * factor),
+      sodium: food.sodium === null ? null : round1(toNum(food.sodium) * factor),
+    });
+  }
+  return { resolved, errors };
+}
+
 // Strict mode requires every property to be present, so optional fields are
 // modeled as nullable and the model sends null to mean "omit this". Drop
 // those before building the request body sent to the Arnold API.
@@ -28,6 +98,17 @@ function pruneNulls(obj: Record<string, unknown>): Record<string, unknown> {
 
 const nullableString = { type: ["string", "null"] as const };
 const nullableNumber = { type: ["number", "null"] as const };
+
+const ingredientInputSchema = {
+  type: "object",
+  properties: {
+    foodName: { type: "string", description: "Matched fuzzily against the saved food library — use find_foods first if unsure of the exact name." },
+    amount: { type: "number", description: "Amount of this food used in the recipe." },
+    unit: { ...nullableString, description: "Unit for amount. Pass null to use the food's own base unit." },
+  },
+  required: ["foodName", "amount", "unit"],
+  additionalProperties: false,
+} as const;
 
 export const READ_ONLY_TOOLS: ToolDef[] = [
   {
@@ -41,7 +122,7 @@ export const READ_ONLY_TOOLS: ToolDef[] = [
   {
     name: "find_foods",
     description:
-      "Search the saved food library by name, or list all saved foods if no query is given. Each food has calories and macros per a base amount (usually 100 g) plus a usual portion.",
+      "Search the saved food library by name, or list all saved foods if no query is given. The match is accent- and case-insensitive and only needs to be a partial match (e.g. \"palamano\" matches \"Tortillas de almendra Palamano\") — try the user's own wording first rather than guessing an exact name. If a query finds nothing, the full list is returned instead so you can look through it yourself and still find the right food's id. Each food has calories and macros per a base amount (usually 100 g) plus a usual portion.",
     parameters: {
       type: "object",
       properties: {
@@ -53,9 +134,12 @@ export const READ_ONLY_TOOLS: ToolDef[] = [
       required: ["query"],
       additionalProperties: false,
     },
-    execute: (args) => {
+    execute: async (args) => {
       const query = str(args, "query");
-      return query ? apiFetch(`/foods/search?q=${encodeURIComponent(query)}`) : apiFetch("/foods");
+      const all = await apiFetch<Array<{ name: string }>>("/foods");
+      if (!query) return all;
+      const matched = all.filter((f) => fuzzyMatches(f.name, query));
+      return matched.length > 0 ? matched : all;
     },
     label: (args) => {
       const query = str(args, "query");
@@ -113,6 +197,30 @@ export const READ_ONLY_TOOLS: ToolDef[] = [
     parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
     execute: () => apiFetch("/body"),
     label: () => "Reading weight & body measurements",
+  },
+  {
+    name: "find_recipes",
+    description:
+      "Search saved recipes by name, or list all saved recipes if no query is given. Same accent/case-insensitive partial match as find_foods, with the same full-list fallback when nothing matches. Each recipe includes its ingredients (name, amount, and that ingredient's calories/macros) and totals for the whole batch (totalAmount/totalCalories/totalProtein/totalFat/totalCarbohydrates/totalSodium). To log a portion eaten, scale the totals by (amount eaten / totalAmount) yourself — this is the same simple per-amount scaling you already do for a library food, not the deficit/TDEE formula — then call add_food_log_entry with the result.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { ...nullableString, description: "Text to search for in recipe names. Pass null to list all recipes." },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    execute: async (args) => {
+      const query = str(args, "query");
+      const all = await listRecipes();
+      if (!query) return all;
+      const matched = all.filter((r) => fuzzyMatches(r.name, query));
+      return matched.length > 0 ? matched : all;
+    },
+    label: (args) => {
+      const query = str(args, "query");
+      return query ? `Searching recipes: "${query}"` : "Listing saved recipes";
+    },
   },
   {
     name: "get_daily_summary",
@@ -391,6 +499,85 @@ export const WRITE_TOOLS: ToolDef[] = [
     },
     execute: (args) => apiFetch(`/foods/${str(args, "id")}`, { method: "DELETE" }),
     label: () => "Deleting saved food",
+  },
+
+  {
+    name: "create_recipe",
+    description:
+      "Save a new recipe made of foods already in the library. Give each ingredient's food name (matched fuzzily, like find_foods) and the amount used. Calories/macros per ingredient and the recipe's totals are computed automatically from the library food's per-base-amount values — never compute them yourself.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        ingredients: { type: "array", items: ingredientInputSchema },
+      },
+      required: ["name", "ingredients"],
+      additionalProperties: false,
+    },
+    execute: async (args) => {
+      const name = str(args, "name");
+      if (!name) return { error: "name is required" };
+      const raw = Array.isArray(args.ingredients)
+        ? (args.ingredients as Array<{ foodName: string; amount: number; unit: string | null }>)
+        : [];
+      const { resolved, errors } = await resolveIngredients(raw);
+      if (resolved.length === 0) return { error: "No ingredients could be matched.", details: errors };
+      const recipe = await createRecipe(name, resolved);
+      return errors.length > 0 ? { recipe, warnings: errors } : recipe;
+    },
+    label: (args) => `Creating recipe: ${str(args, "name") ?? ""}`,
+  },
+  {
+    name: "update_recipe",
+    description:
+      "Edit an existing recipe. Send name to rename it. To change ingredients, send the FULL replacement ingredients list (not just the changed ones) — same shape as create_recipe; totals are recomputed automatically. Look up the id with find_recipes first.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        name: { ...nullableString },
+        ingredients: { type: ["array", "null"], items: ingredientInputSchema },
+      },
+      required: ["id", "name", "ingredients"],
+      additionalProperties: false,
+    },
+    execute: async (args) => {
+      const id = str(args, "id");
+      if (!id) return { error: "id is required" };
+      const name = str(args, "name");
+      const fields: { name?: string; ingredients?: RecipeIngredient[] } = {};
+      if (name) fields.name = name;
+      let warnings: string[] | undefined;
+      if (Array.isArray(args.ingredients)) {
+        const raw = args.ingredients as Array<{ foodName: string; amount: number; unit: string | null }>;
+        const { resolved, errors } = await resolveIngredients(raw);
+        if (resolved.length === 0) return { error: "No ingredients could be matched.", details: errors };
+        fields.ingredients = resolved;
+        if (errors.length > 0) warnings = errors;
+      }
+      const recipe = await updateRecipe(id, fields);
+      if (!recipe) return { error: "Recipe not found" };
+      return warnings ? { recipe, warnings } : recipe;
+    },
+    label: () => "Updating recipe",
+  },
+  {
+    name: "delete_recipe",
+    description:
+      "Permanently delete a saved recipe. Only call this when the user clearly identified which recipe to remove. Look up the id with find_recipes first.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    execute: async (args) => {
+      const id = str(args, "id");
+      if (!id) return { error: "id is required" };
+      const ok = await deleteRecipe(id);
+      return ok ? { success: true } : { error: "Recipe not found" };
+    },
+    label: () => "Deleting recipe",
   },
 
   {
