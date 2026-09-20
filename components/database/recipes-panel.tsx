@@ -419,7 +419,7 @@ function RecipeFormModal({
 
         <div className="rounded-2xl bg-white/80 ring-1 ring-black/5 p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Totals</p>
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
             <div>
               <p className="text-sm font-bold text-slate-900">{num(totals.amount)} g</p>
               <p className="text-xs text-slate-500">Weight</p>
@@ -439,6 +439,10 @@ function RecipeFormModal({
             <div>
               <p className="text-sm font-bold text-slate-900">{num(totals.carbohydrates)} g</p>
               <p className="text-xs text-slate-500">Carbs</p>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">{num(totals.sodium)} mg</p>
+              <p className="text-xs text-slate-500">Sodium</p>
             </div>
           </div>
         </div>
